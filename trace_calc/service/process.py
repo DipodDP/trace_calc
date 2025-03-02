@@ -1,5 +1,10 @@
-from trace_calc.models.input_data import InputData
-from trace_calc.service.base import BaseCalculator, BasePathStorage, BaseElevationsApiClient
+from trace_calc.models.input_data import Coordinates, InputData
+from trace_calc.service.base import (
+    BaseCalculator,
+    BaseElevationsApiClient,
+    BasePathStorage,
+)
+from trace_calc.service.profile_service import PathProfileService
 
 
 class AnalyzerService:
