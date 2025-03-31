@@ -31,12 +31,6 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
         querystring = {"points": "["}
 
         for coord in coord_vect_block:
-            # getting back W and S coords from coord vector
-            if coord[0] > 180:
-                coord[0] = coord[0] - 360
-            if coord[1] > 180:
-                coord[1] = coord[1] - 360
-
             querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
 
         querystring["points"] = querystring["points"][:-1] + "]"
@@ -45,7 +39,7 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
         )
         resp = json.loads(response.text)
 
-        print(f'\nQuery string: {querystring["points"][:80]}...')
+        print(f"\nQuery string: {querystring['points'][:80]}...")
 
         if response.status_code in [200, 301, 302]:
             resp_data = resp
@@ -53,7 +47,7 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
 
         else:
             raise APIException(
-                f'{response.status_code} - {": ".join(list(resp.values()))}'
+                f"{response.status_code} - {': '.join(list(resp.values()))}"
             )
 
     async def fetch_elevations(
@@ -62,9 +56,9 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
         """
         Retrieves elevation data in blocks for the given coordinate vector.
         """
-        assert (
-            coord_vect.shape[0] % block_size == 0
-        ), f"Supports only {block_size} wide requests"
+        assert coord_vect.shape[0] % block_size == 0, (
+            f"Supports only {block_size} wide requests"
+        )
         blocks_num = coord_vect.shape[0] // block_size
         print("Retrieving data...")
         bar = ProgressBar(max_value=blocks_num).start()
@@ -95,25 +89,9 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
                 "X-RapidAPI-Key": self.api_key,
             }
 
-            # Build points list with coordinate normalization
-            # coords = [
-            #     [coord[0] % 360 - 180, coord[1] % 360 - 180]
-            #     for coord in coord_vect_block
-            # ]
-
-            # params = {"points": json.dumps(points)}
             querystring = {"points": "["}
-
-            # for coord in coords:
             for coord in coord_vect_block:
-                # getting back W and S coords from coord vector
-                if coord[0] > 180:
-                    coord[0] = coord[0] - 360
-                if coord[1] > 180:
-                    coord[1] = coord[1] - 360
-
                 querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
-
             querystring["points"] = querystring["points"][:-1] + "]"
 
             print("------- Start fetching block of elevations -------")
@@ -121,7 +99,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             response = await client.get(
                 self.api_url, headers=headers, params=querystring, timeout=30.0
             )
-            print("------- Got response -------")
+            print("------- Got response -------", response.status_code)
 
             if not response.is_success:
                 try:
@@ -130,7 +108,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
                         f"{response.status_code} - {': '.join(error_data.values())}"
                     )
                 except json.JSONDecodeError:
-                    raise APIException(f"{response.status_code} - Unknown error")
+                    raise APIException(f"{response.status_code} - {response.text}")
 
             return response.json()
 
@@ -156,7 +134,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         errors = []
 
         for idx, result in enumerate(results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 errors.append((idx, result))
                 # For API errors, consider adding retry logic here
                 # if isinstance(result, APIException):
@@ -167,6 +145,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         print(f"---- Got {len(results)} blocks -----")
         print(results)
 
+        if errors:
+            raise APIException(errors)
         elevations = np.append(*successes)
-
         return elevations
