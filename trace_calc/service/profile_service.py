@@ -32,7 +32,7 @@ class PathProfileService:
         Generates a coordinate vector between two points with a given resolution.
         """
 
-        # Adjust S and W coordinates if necessary
+        # Extend coordinates longitude if crossing 180 degree to create linear space vector
         coord_a, coord_b = self._get_extended_coordinates(self.coord_a, self.coord_b)
 
         full_distance = self.get_distance(
@@ -44,8 +44,9 @@ class PathProfileService:
         ).astype(int)
         lat_vector = np.linspace(coord_a[0], coord_b[0], points_num)
         lon_vector = np.linspace(coord_a[1], coord_b[1], points_num)
+
+        # Getting back normal longitude
         for i in range(lon_vector.size):
-            # getting back W and S coords from coord vector
             if lon_vector[i] > 180:
                 lon_vector[i] = self.normalize_longitude_180(lon_vector[i])
 
