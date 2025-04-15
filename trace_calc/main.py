@@ -3,8 +3,8 @@ from pathlib import Path
 from trace_calc.models.input_data import Coordinates, InputData
 from environs import Env
 
+from trace_calc.service.analyzers import GrozaAnalyzer
 from trace_calc.service.api_clients import AsyncElevationsApiClient
-from trace_calc.service.path_calculator import GrozaCalculator
 from trace_calc.service.path_storage import FilePathStorage
 from trace_calc.service.process import AnalyzerService
 
@@ -34,11 +34,8 @@ class Application:
         self.input_handler = UserInputHandler()
 
     async def run(self, service: AnalyzerService):
-        # analyzer_type = input("Choose analyzer (groza/sosnik): ").lower().strip()
         stored_filename = input("Enter stored file name (without .path): ")
         file_path = Path(stored_filename + ".path")
-
-        input_data = InputData(stored_filename)
         antennas_heights = {
             k: v
             for k, v in {
@@ -51,6 +48,9 @@ class Application:
             }.items()
             if v is not None
         }
+
+        input_data = InputData(stored_filename)
+        # input_data = InputData(stored_filename, **antennas_heights)
 
         # Process the data: fetch additional info, calculate, and store the result.
         try:
@@ -65,22 +65,8 @@ class Application:
             input_data.site_b_coordinates = self.input_handler.get_coordinates(
                 'Input site "B" coordinates (format: -123.456 12.345): ',
             )
-            result = await service.process(input_data, **antennas_heights)
-
-        # if analyzer_type == "groza":
-        #     analyzer = GrozaAnalyzer(
-        #         coord_a, coord_b, Lk=0, path_filename=stored_filename, ha1=ha1, ha2=ha2
-        #     )
-        # elif analyzer_type == "sosnik":
-        #     analyzer = SosnikAnalyzer(
-        #         coord_a, coord_b, Lk=0, path_filename=stored_filename, ha1=ha1, ha2=ha2
-        #     )
-        # else:
-        #     print("Unknown analyzer type. Exiting.")
-        #     return
-        # analyzer = SosnikAnalyzer(
-        #     coord_a, coord_b, Lk=0, path_filename=stored_filename, ha1=ha1, ha2=ha2
-        # )
+            result = await service.process(input_data)
+            # result = await service.process(input_data, **antennas_heights)
 
         print("Analysis Result:", result)
 
@@ -92,9 +78,11 @@ if __name__ == "__main__":
 
     elevations_api_key = env.str("ELEVATION_API_KEY")
     elevations_api_url = env.str("ELEVATION_API_URL")
-    path_fetcher = AsyncElevationsApiClient(elevations_api_url, elevations_api_key)
 
-    calculator = GrozaCalculator()
     storage = FilePathStorage()
-    groza_service = AnalyzerService(calculator, storage, path_fetcher)
+    elevations_api_client = AsyncElevationsApiClient(
+        elevations_api_url, elevations_api_key
+    )
+
+    groza_service = AnalyzerService(GrozaAnalyzer, storage, elevations_api_client)
     asyncio.run(Application().run(groza_service))
