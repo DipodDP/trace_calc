@@ -19,10 +19,6 @@ class APIException(Exception):
 
 
 class SyncElevationsApiClient(BaseElevationsApiClient):
-    def __init__(self, api_url: str, api_key: str):
-        self.api_url = api_url
-        self.api_key = api_key
-
     def elevations_api_request(self, coord_vect_block: Iterable):
         headers = {
             "X-RapidAPI-Host": self.api_url.split("/")[2],  # Getting host from API URL
@@ -81,10 +77,6 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
 
 
 class AsyncElevationsApiClient(BaseElevationsApiClient):
-    def __init__(self, api_url: str, api_key: str):
-        self.api_url = api_url
-        self.api_key = api_key
-
     async def elevations_api_request(self, coord_vect_block: Iterable) -> list[float]:
         """Asynchronous API request with httpx"""
         headers = {

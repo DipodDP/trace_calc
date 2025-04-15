@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.models.path import PathData
+from trace_calc.models.input_data import InputData
 from trace_calc.models.path import HCAData, PathData
 
 
@@ -37,7 +37,7 @@ class BasePathStorage(ABC):
 class BaseElevationsApiClient(ABC):
     def __init__(self, api_url: str, api_key: str):
         self.api_url = api_url
-        self.elevations_api_key = api_key
+        self.api_key = api_key
 
     @abstractmethod
     async def fetch_elevations(
@@ -52,7 +52,6 @@ class BaseElevationsApiClient(ABC):
         pass
 
 
-class BaseCalculator(ABC):
 class BaseHCACalulator(ABC):
     def __init__(self, profile: PathData, input_data: InputData):
         self.antenna_a_height = input_data.antenna_a_height
@@ -65,12 +64,13 @@ class BaseHCACalulator(ABC):
         pass
 
 
+class BaseSpeedCalculator(ABC):
     """
     Abstract base class for performing calculations.
     """
 
     @abstractmethod
-    def calculate(self, *args, **kwargs) -> tuple[float, ...]:
+    def calculate_speed(self, *args, **kwargs) -> tuple[float, ...]:
         """
         Perform calculations based on provided parameters.
 
@@ -79,21 +79,13 @@ class BaseHCACalulator(ABC):
         pass
 
 
-class BaseAnalyzer(ABC):
+class BaseAnalyzer(BaseSpeedCalculator, BaseHCACalulator):
     """
     Abstract base class for performing analysis.
     """
 
-    def __init__(self, coord_a, coord_b, Lk, path_filename, ha1, ha2):
-        self.coord_a = coord_a
-        self.coord_b = coord_b
-        self.Lk = Lk
-        self.path_filename = path_filename
-        self.ha1 = ha1
-        self.ha2 = ha2
-
     @abstractmethod
-    async def analyze(self) -> dict:
+    def analyze(self, /, **kwargs: Any) -> dict:
         """
         Asynchronously perform analysis and return the results as a dictionary.
 

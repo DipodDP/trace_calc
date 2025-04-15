@@ -1,10 +1,10 @@
 from typing import Tuple
 
-from trace_calc.service.base import BaseCalculator
+from trace_calc.service.base import BaseSpeedCalculator
 
 
-class GrozaCalculator(BaseCalculator):
-    def calculate(self, L0, Lmed, Lr, Lk, ld) -> Tuple[float, float, float]:
+class GrozaSpeedCalculator(BaseSpeedCalculator):
+    def calculate_speed(self, L0, Lmed, Lr, Lk, ld) -> Tuple[float, float, float]:
         L = L0 + Lmed + Lr + Lk + ld
         dL = L - 233.8
         if dL > -1.66:
@@ -16,8 +16,8 @@ class GrozaCalculator(BaseCalculator):
         return L, dL, speed
 
 
-class SosnikCalculator(BaseCalculator):
-    def calculate(self, trace_dist, Lr, b_sum) -> Tuple[float, float]:
+class SosnikSpeedCalculator(BaseSpeedCalculator):
+    def calculate_speed(self, trace_dist, Lr, b_sum) -> Tuple[float, float]:
         extra_dist = 148 * b_sum if b_sum > 0 else 0
         equal_dist = trace_dist + extra_dist
 
