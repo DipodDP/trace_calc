@@ -5,6 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from trace_calc.models.path import PathData
+from trace_calc.models.path import HCAData, PathData
 
 
 class BasePathStorage(ABC):
@@ -52,6 +53,18 @@ class BaseElevationsApiClient(ABC):
 
 
 class BaseCalculator(ABC):
+class BaseHCACalulator(ABC):
+    def __init__(self, profile: PathData, input_data: InputData):
+        self.antenna_a_height = input_data.antenna_a_height
+        self.antenna_b_height = input_data.antenna_b_height
+        self.elevations = profile.elevations
+        self.distances = profile.distances
+
+    @abstractmethod
+    def calculate_hca(self) -> HCAData:
+        pass
+
+
     """
     Abstract base class for performing calculations.
     """

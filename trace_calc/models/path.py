@@ -24,3 +24,15 @@ class PathData:
             f"PathData(coordinates={self.coordinates}, "
             f"distances={self.distances}, elevations={self.elevations})"
         )
+
+
+class HCAData(NamedTuple):
+    """
+    Model that holds horizon close angle, calculated for a path between two sites.
+    """
+
+    b1_max: float
+    b2_max: float
+    b_sum: float
+    b1_idx: int
+    b2_idx: int
