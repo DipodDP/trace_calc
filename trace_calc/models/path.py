@@ -1,29 +1,23 @@
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
 
 
-# --- Domain Model ---
+@dataclass(slots=True)
 class PathData:
     """
     Model that holds path-related data.
+
+    :param coordinates: An array of coordinates (e.g., [[lat, lon], ...])
+    :param distances: An array of distances
+    :param elevations: An array of elevations
     """
 
-    def __init__(
-        self,
-        coordinates: NDArray[np.floating[Any]],
-        distances: NDArray[np.float64],
-        elevations: NDArray[np.float64],
-    ):
-        """
-        :param coordinates: An array or list of coordinates (e.g., [[lat, lon], ...])
-        :param distances: An array or list of distances
-        :param elevations: An array or list of elevations
-        """
-        self.coordinates = coordinates
-        self.distances = distances
-        self.elevations = elevations
+    coordinates: NDArray[np.floating[Any]]
+    distances: NDArray[np.float64]
+    elevations: NDArray[np.float64]
 
     def __repr__(self):
         return (
