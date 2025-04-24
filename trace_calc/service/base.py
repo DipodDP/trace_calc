@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.models.input_data import InputData
+from trace_calc.models.input_data import Coordinates, InputData
 from trace_calc.models.path import HCAData, PathData
 
 
@@ -34,11 +35,13 @@ class BasePathStorage(ABC):
         pass
 
 
-class BaseElevationsApiClient(ABC):
+class BaseApiClient(ABC):
     def __init__(self, api_url: str, api_key: str):
         self.api_url = api_url
         self.api_key = api_key
 
+
+class BaseElevationsApiClient(BaseApiClient):
     @abstractmethod
     async def fetch_elevations(
         self,
@@ -47,6 +50,18 @@ class BaseElevationsApiClient(ABC):
     ) -> NDArray[np.float64]:
         """
         Fetch elevations for a given block of coordinates.
+        This method must be implemented by subclasses.
+        """
+        pass
+
+
+class BaseDeclinationsApiClient(BaseApiClient):
+    @abstractmethod
+    async def fetch_declinations(
+        self, coordinates: Iterable[Coordinates]
+    ) -> list[float]:
+        """
+        Fetch magnet declinations for the given coordinates.
         This method must be implemented by subclasses.
         """
         pass
