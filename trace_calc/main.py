@@ -4,9 +4,12 @@ from trace_calc.models.input_data import Coordinates, InputData
 from environs import Env
 
 from trace_calc.service.analyzers import GrozaAnalyzer
-from trace_calc.service.api_clients import AsyncElevationsApiClient
+from trace_calc.service.api_clients import (
+    AsyncElevationsApiClient,
+    AsyncMagDeclinationApiClient,
+)
 from trace_calc.service.path_storage import FilePathStorage
-from trace_calc.service.process import AnalyzerService
+from trace_calc.service.process import AnalyzerService, GeoDataService
 
 
 # --- Input Handling ---
@@ -33,7 +36,7 @@ class Application:
     def __init__(self):
         self.input_handler = UserInputHandler()
 
-    async def run(self, service: AnalyzerService):
+    async def run(self, service: AnalyzerService, geo_data_service: GeoDataService):
         stored_filename = input("Enter stored file name (without .path): ")
         file_path = Path(stored_filename + ".path")
         antennas_heights = {
@@ -53,6 +56,8 @@ class Application:
         # input_data = InputData(stored_filename, **antennas_heights)
 
         # Process the data: fetch additional info, calculate, and store the result.
+
+        print("\n___________Calculation results___________\n")
         try:
             result = await service.process(input_data)
         except ValueError:
@@ -68,7 +73,12 @@ class Application:
             result = await service.process(input_data)
             # result = await service.process(input_data, **antennas_heights)
 
-        print("Analysis Result:", result)
+        print("Analysis result:", result)
+        geo_data = await geo_data_service.process(
+            service.path_data.coordinates[0],
+            service.path_data.coordinates[-1],
+        )
+        print("Geo data:", geo_data)
 
 
 # --- Run the Application ---
@@ -79,10 +89,18 @@ if __name__ == "__main__":
     elevations_api_key = env.str("ELEVATION_API_KEY")
     elevations_api_url = env.str("ELEVATION_API_URL")
 
+    declinations_api_key = env.str("DECLINATION_API_KEY")
+    declinations_api_url = env.str("DECLINATION_API_URL")
+
     storage = FilePathStorage()
     elevations_api_client = AsyncElevationsApiClient(
         elevations_api_url, elevations_api_key
     )
+    declinations_api_client = AsyncMagDeclinationApiClient(
+        declinations_api_url, declinations_api_key
+    )
 
     groza_service = AnalyzerService(GrozaAnalyzer, storage, elevations_api_client)
-    asyncio.run(Application().run(groza_service))
+    geo_data_service = GeoDataService(declinations_api_client)
+
+    asyncio.run(Application().run(groza_service, geo_data_service))

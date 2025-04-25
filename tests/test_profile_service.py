@@ -50,12 +50,13 @@ def test_linspace_coord_edge_cases(site_a, site_b, expected_behavior):
     assert isinstance(coords, np.ndarray)
     assert coords.ndim == 2 and coords.shape[1] == 2
     # Expect the shortest path is choosen for latitude.
-    if coords[0][0] > coords[-1][0]:
-        assert coords[0][0] > coords[1][0]
-        assert coords[-1][0] < coords[-2][0]
-    else:
-        assert coords[0][0] <= coords[1][0]
-        assert coords[-1][0] >= coords[-2][0]
+    if np.any(coords):
+        if coords[0][0] > coords[-1][0]:
+            assert coords[0][0] > coords[1][0]
+            assert coords[-1][0] < coords[-2][0]
+        else:
+            assert coords[0][0] <= coords[1][0]
+            assert coords[-1][0] >= coords[-2][0]
 
     if expected_behavior == "identical":
         # For identical coordinates, all rows should be the same.

@@ -6,6 +6,29 @@ from numpy.typing import NDArray
 
 
 @dataclass(slots=True)
+class GeoData:
+    """
+    Model that holds geo data of the sites.
+    """
+
+    distance: float
+    mag_declination_a: float
+    mag_declination_b: float
+    true_azimuth_a_b: float
+    true_azimuth_b_a: float
+    mag_azimuth_a_b: float
+    mag_azimuth_b_a: float
+
+    def __repr__(self):
+        return (
+            f"GeoData(distance={self.distance}, "
+            f"true_azimuth_a_b={self.true_azimuth_a_b}, true_azimuth_b_a={self.true_azimuth_b_a},"
+            f"mag_declination_a={self.mag_declination_a}, mag_declination_b={self.mag_declination_b},"
+            " ... )"
+        )
+
+
+@dataclass(slots=True)
 class PathData:
     """
     Model that holds path-related data.

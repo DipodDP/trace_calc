@@ -3,9 +3,10 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.models.input_data import Coordinates, InputData
+from trace_calc.models.input_data import InputData
 from trace_calc.models.path import PathData
 from trace_calc.service.base import BaseElevationsApiClient
+from trace_calc.service.coordinates_service import CoordinatesService
 
 
 class PathProfileService:
@@ -32,12 +33,12 @@ class PathProfileService:
         Generates a coordinate vector between two points with a given resolution.
         """
 
-        # Extend coordinates longitude if crossing 180 degree to create linear space vector
-        coord_a, coord_b = self._get_extended_coordinates(self.coord_a, self.coord_b)
+        coordinates_service = CoordinatesService(self.coord_a, self.coord_b)
+        full_distance = coordinates_service.get_distance()
 
-        full_distance = self.get_distance(
-            coord_a, coord_b, from_extended_coordinates=True
-        )
+        # Extend coordinates longitude if crossing 180 degree to create linear space vector
+        coord_a, coord_b = coordinates_service.get_extended_coordinates()
+
         points_num = (
             np.ceil(full_distance / (self.block_size * self.resolution))
             * self.block_size
@@ -48,7 +49,9 @@ class PathProfileService:
         # Getting back normal longitude
         for i in range(lon_vector.size):
             if lon_vector[i] > 180:
-                lon_vector[i] = self.normalize_longitude_180(lon_vector[i])
+                lon_vector[i] = CoordinatesService.normalize_longitude_180(
+                    lon_vector[i]
+                )
 
         return np.column_stack((lat_vector, lon_vector))
 
@@ -69,68 +72,11 @@ class PathProfileService:
         # Calculate cumulative distance along the coordinate vector
         path_profile.distances[0] = 0.0
         for i in range(1, points_num):
-            path_profile.distances[i] = self.get_distance(
-                self.coord_vect[0], self.coord_vect[i], from_extended_coordinates=True
+            coordinates_service = CoordinatesService(
+                self.coord_vect[0], self.coord_vect[i]
             )
+            path_profile.distances[i] = coordinates_service.get_distance()
         path_profile.elevations = await self.elevations_api_client.fetch_elevations(
             self.coord_vect, self.block_size
         )
         return path_profile
-
-    @classmethod
-    def get_distance(
-        cls, coord_1: Coordinates, coord_2: Coordinates, from_extended_coordinates=False
-    ) -> float:
-        """
-        Calculates the distance between two coordinates in kilometers.
-        """
-        return 6371.21 * cls.get_angle(coord_1, coord_2, from_extended_coordinates)
-
-    @classmethod
-    def get_angle(
-        cls, coord_1: Coordinates, coord_2: Coordinates, from_extended_coordinates=False
-    ):
-        """
-        Calculates the angular separation (in radians) between two coordinates.
-        """
-        if not from_extended_coordinates:
-            coord_1, coord_2 = cls._get_extended_coordinates(coord_1, coord_2)
-
-        a = (coord_1[0] * np.pi / 180.0, coord_1[1] * np.pi / 180.0)
-        b = (coord_2[0] * np.pi / 180.0, coord_2[1] * np.pi / 180.0)
-        return np.arccos(
-            np.sin(a[0]) * np.sin(b[0])
-            + np.cos(a[0]) * np.cos(b[0]) * np.cos(b[1] - a[1])
-        )
-
-    @staticmethod
-    def normalize_longitude_180(lon: float) -> float:
-        """
-        Normalize a longitude to 0...180 for east and 0...-180 for west.
-        """
-        return ((lon + 180) % 360) - 180
-
-    @staticmethod
-    def coord_min2dec(degree: int, minutes: int, seconds=0.0):
-        """
-        Converts coordinates in degrees, minutes, and seconds to decimal degrees.
-        """
-        return degree + minutes / 60 + seconds / 3600
-
-    @staticmethod
-    def _get_extended_coordinates(
-        coord_1: Coordinates, coord_2: Coordinates
-    ) -> tuple[Coordinates, Coordinates]:
-        """
-        Adjusts for negative coordinates if needed.
-        """
-        lat_a, lon_a = coord_1
-        lat_b, lon_b = coord_2
-
-        # Adjust longitude (index 1)
-        if lon_a < 0 and abs(lon_a + 360 - lon_b) < 180:
-            lon_a += 360
-        if lon_b < 0 and abs(lon_b + 360 - lon_a) < 180:
-            lon_b += 360
-
-        return Coordinates(lat_a, lon_a), Coordinates(lat_b, lon_b)
