@@ -1,11 +1,27 @@
 import math
 
+from numpy import float64
+from numpy.typing import NDArray
+
+from trace_calc.models.input_data import InputData
+from trace_calc.models.path import ProfileData
 from trace_calc.service.base import BaseAnalyzer
+from trace_calc.service.plotter import ProfilePlotter
 from trace_calc.service.profile_data_calculator import DefaultProfileDataCalculator
 from trace_calc.service.speed_calculators import (
     GrozaSpeedCalculator,
     SosnikSpeedCalculator,
 )
+
+
+class PlotterMixin:
+    distances: NDArray[float64]
+    profile_data: ProfileData
+    input_data: InputData
+
+    def draw_plot(self):
+        plotter = ProfilePlotter(self.profile_data)
+        plotter.plot(self.distances, self.input_data.path_filename)
 
 
 class PrinterMixin:
@@ -31,6 +47,7 @@ class GrozaAnalyzer(
     DefaultProfileDataCalculator,
     GrozaSpeedCalculator,
     PrinterMixin,
+    PlotterMixin,
 ):
     @staticmethod
     def _l0_calc(R, lam=0.06):
@@ -95,6 +112,7 @@ class GrozaAnalyzer(
             "speed_prefix": speed_prefix,
         }
         self.print_results(**data)
+        self.draw_plot()
 
         return data
 
@@ -104,6 +122,7 @@ class SosnikAnalyzer(
     DefaultProfileDataCalculator,
     SosnikSpeedCalculator,
     PrinterMixin,
+    PlotterMixin,
 ):
     def analyze(self, **kwargs) -> dict:
         trace_dist = self.distances[-1]
@@ -132,5 +151,6 @@ class SosnikAnalyzer(
             "speed_prefix": "k",
         }
         self.print_results(**data)
+        self.draw_plot()
 
         return data
