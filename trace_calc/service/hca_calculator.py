@@ -1,6 +1,5 @@
 import math
 
-import numpy as np
 from numpy import correlate, float64, pad, ones
 from numpy.fft import fft, ifft
 from numpy.typing import NDArray
@@ -15,9 +14,9 @@ class ElevationsFilterFFT:
 
     def filter_elevation_profile(self, aa_level):
         # filter profile via FFT
-        elevations_fft = fft(np.pad(self.elevations, (10, 10), "edge"))
-        z0 = round(elevations_fft.size / (2 * aa_level))
-        z1 = round(elevations_fft.size - elevations_fft.size / (2 * aa_level))
+        elevations_fft = fft(pad(self.elevations, (10, 10), "edge"))
+        z0 = round(elevations_fft.size / (1.4 * aa_level))
+        z1 = round(elevations_fft.size - elevations_fft.size / (1.4 * aa_level))
         elevations_fft[z0:z1] = 0
         filtered_elevations = ifft(elevations_fft)[10 : elevations_fft.size - 10].real
 
@@ -28,7 +27,7 @@ class ElevationsFilterDefault:
     elevations: NDArray[float64]
 
     def filter_elevation_profile(self):
-        window = ones(5) / 5
+        window = ones(2) / 2
         filtered_elevations = correlate(
             pad(self.elevations, (10, 10), "edge"), window, "same"
         )[10 : self.elevations.size + 10]
@@ -73,8 +72,15 @@ class HCACalculator(BaseHCACalculator):
         return HCAData(b1_max, b2_max, b_sum, b1_idx, b2_idx)
 
     @staticmethod
-    def betta_calc(h1, h2, R, ha=2):
-        return math.atan2((h2 - (R**2 / 12.742) - h1 - ha), (R * 1000)) * 180 / math.pi
+    def betta_calc(site_height, obstacle_height, R, antenna_height=2):
+        return (
+            math.atan2(
+                (obstacle_height - (R**2 / 12.742) - site_height - antenna_height),
+                (R * 1000),
+            )
+            * 180
+            / math.pi
+        )
 
 
 class HCACalculatorDefault(HCACalculator, ElevationsFilterDefault):
@@ -89,5 +95,5 @@ class HCACalculatorFFT(HCACalculator, ElevationsFilterFFT):
     def __init__(self, profile: PathData, input_data: InputData):
         super().__init__(profile, input_data)
 
-        self.elevations = self.filter_elevation_profile(2.5)
+        self.elevations = self.filter_elevation_profile(3.6)
         self.hca_data = self.calculate_hca()
