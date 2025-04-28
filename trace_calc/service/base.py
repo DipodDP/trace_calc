@@ -73,6 +73,7 @@ class BaseHCACalculator(ABC):
         self.antenna_b_height = input_data.antenna_b_height
         self.elevations = profile.elevations
         self.distances = profile.distances
+        self.input_data = input_data
 
     @abstractmethod
     def calculate_hca(self) -> HCAData:

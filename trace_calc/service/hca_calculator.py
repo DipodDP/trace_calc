@@ -13,7 +13,8 @@ class ElevationsFilterFFT:
     elevations: NDArray[float64]
 
     def filter_elevation_profile(self, aa_level):
-        # filter profile via FFT
+        """Filter profile via FFT"""
+
         elevations_fft = fft(pad(self.elevations, (10, 10), "edge"))
         z0 = round(elevations_fft.size / (1.4 * aa_level))
         z1 = round(elevations_fft.size - elevations_fft.size / (1.4 * aa_level))
@@ -23,10 +24,12 @@ class ElevationsFilterFFT:
         return filtered_elevations
 
 
-class ElevationsFilterDefault:
+class ElevationsFilterCC:
     elevations: NDArray[float64]
 
     def filter_elevation_profile(self):
+        """Filter profile via cross correlation"""
+
         window = ones(2) / 2
         filtered_elevations = correlate(
             pad(self.elevations, (10, 10), "edge"), window, "same"
@@ -83,7 +86,7 @@ class HCACalculator(BaseHCACalculator):
         )
 
 
-class HCACalculatorDefault(HCACalculator, ElevationsFilterDefault):
+class HCACalculatorCC(HCACalculator, ElevationsFilterCC):
     def __init__(self, profile: PathData, input_data: InputData):
         super().__init__(profile, input_data)
 

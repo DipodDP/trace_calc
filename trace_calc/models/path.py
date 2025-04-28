@@ -59,3 +59,27 @@ class HCAData(NamedTuple):
     b_sum: float
     b1_idx: int
     b2_idx: int
+
+
+class ProfileViewData(NamedTuple):
+    """
+    Container for elevation profile and its corresponding baseline values.
+    """
+
+    elevations: NDArray[np.float64]  # Elevation values along the path
+    baseline: NDArray[np.float64]  # Corresponding baseline values
+
+
+@dataclass(slots=True)
+class ProfileData:
+    """
+    Aggregated profile outputs: flat, curved, and sight-line data.
+
+    :param plain: Plain profile ProfileViewData
+    :param curved: Curved profile ProfileViewData
+    :param elevations: A tuple of line A, line B coefficients and intersection point
+    """
+
+    plain: ProfileViewData
+    curved: ProfileViewData
+    lines_of_sight: tuple[np.ndarray, np.ndarray, tuple[float, float]]

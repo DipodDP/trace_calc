@@ -1,7 +1,7 @@
 import numpy as np
 from trace_calc.models.input_data import InputData
 from trace_calc.models.path import PathData
-from trace_calc.service.hca_calculator import HCACalculatorDefault, HCACalculatorFFT
+from trace_calc.service.hca_calculator import HCACalculatorCC, HCACalculatorFFT
 
 # Set fixed seed for reproducibility
 np.random.seed(42)
@@ -27,8 +27,8 @@ test_profile = PathData(
 )
 
 
-def test_hca_calculator_default():
-    result = HCACalculatorDefault(test_profile, InputData("test_file"))
+def test_hca_calculator_cross_correlation():
+    result = HCACalculatorCC(test_profile, InputData("test_file"))
     assert f"{result.hca_data.b_sum:.3f}" == "0.552"
 
 

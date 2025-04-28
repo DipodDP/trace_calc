@@ -1,7 +1,7 @@
 import math
 
 from trace_calc.service.base import BaseAnalyzer
-from trace_calc.service.hca_calculator import HCACalculatorDefault
+from trace_calc.service.profile_data_calculator import DefaultProfileDataCalculator
 from trace_calc.service.speed_calculators import (
     GrozaSpeedCalculator,
     SosnikSpeedCalculator,
@@ -27,7 +27,10 @@ class PrinterMixin:
 
 
 class GrozaAnalyzer(
-    BaseAnalyzer, HCACalculatorDefault, GrozaSpeedCalculator, PrinterMixin
+    BaseAnalyzer,
+    DefaultProfileDataCalculator,
+    GrozaSpeedCalculator,
+    PrinterMixin,
 ):
     @staticmethod
     def _l0_calc(R, lam=0.06):
@@ -97,7 +100,10 @@ class GrozaAnalyzer(
 
 
 class SosnikAnalyzer(
-    BaseAnalyzer, HCACalculatorDefault, SosnikSpeedCalculator, PrinterMixin
+    BaseAnalyzer,
+    DefaultProfileDataCalculator,
+    SosnikSpeedCalculator,
+    PrinterMixin,
 ):
     def analyze(self, **kwargs) -> dict:
         trace_dist = self.distances[-1]
