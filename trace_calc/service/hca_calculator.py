@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 from trace_calc.models.input_data import InputData
 from trace_calc.models.path import HCAData, PathData
-from trace_calc.service.base import BaseHCACalulator
+from trace_calc.service.base import BaseHCACalculator
 
 
 class ElevationsFilterFFT:
@@ -36,8 +36,8 @@ class ElevationsFilterDefault:
         return filtered_elevations
 
 
-class HCACalulator(BaseHCACalulator):
-    def calculate_hca(self):
+class HCACalculator(BaseHCACalculator):
+    def calculate_hca(self) -> HCAData:
         # find left hca (horizon close angle)
         start_point = self.elevations[0]
         b1_max = -360
@@ -77,7 +77,7 @@ class HCACalulator(BaseHCACalulator):
         return math.atan2((h2 - (R**2 / 12.742) - h1 - ha), (R * 1000)) * 180 / math.pi
 
 
-class HCACalulatorDefault(HCACalulator, ElevationsFilterDefault):
+class HCACalculatorDefault(HCACalculator, ElevationsFilterDefault):
     def __init__(self, profile: PathData, input_data: InputData):
         super().__init__(profile, input_data)
 
@@ -85,7 +85,7 @@ class HCACalulatorDefault(HCACalulator, ElevationsFilterDefault):
         self.hca_data = self.calculate_hca()
 
 
-class HCACalulatorFFT(HCACalulator, ElevationsFilterFFT):
+class HCACalculatorFFT(HCACalculator, ElevationsFilterFFT):
     def __init__(self, profile: PathData, input_data: InputData):
         super().__init__(profile, input_data)
 

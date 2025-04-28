@@ -67,7 +67,7 @@ class BaseDeclinationsApiClient(BaseApiClient):
         pass
 
 
-class BaseHCACalulator(ABC):
+class BaseHCACalculator(ABC):
     def __init__(self, profile: PathData, input_data: InputData):
         self.antenna_a_height = input_data.antenna_a_height
         self.antenna_b_height = input_data.antenna_b_height
@@ -94,7 +94,7 @@ class BaseSpeedCalculator(ABC):
         pass
 
 
-class BaseAnalyzer(BaseSpeedCalculator, BaseHCACalulator):
+class BaseAnalyzer(BaseSpeedCalculator, BaseHCACalculator):
     """
     Abstract base class for performing analysis.
     """
