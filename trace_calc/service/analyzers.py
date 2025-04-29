@@ -21,7 +21,7 @@ class PlotterMixin:
 
     def draw_plot(self):
         plotter = ProfilePlotter(self.profile_data)
-        plotter.plot(self.distances, self.input_data.path_filename)
+        plotter.plot(self.distances, self.input_data.path_name)
 
 
 class PrinterMixin:

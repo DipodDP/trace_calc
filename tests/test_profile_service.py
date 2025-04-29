@@ -3,6 +3,7 @@ import pytest
 
 from trace_calc.models.input_data import Coordinates, InputData
 from trace_calc.service.base import BaseElevationsApiClient
+from trace_calc.service.exceptions import CoordinatesRequiredException
 from trace_calc.service.profile_service import PathProfileService
 
 
@@ -90,7 +91,7 @@ def test_linspace_coord_edge_cases(site_a, site_b, expected_behavior):
 
 def test_initialization_error():
     # Test that a ValueError is raised when either coordinate is missing.
-    with pytest.raises(ValueError):
+    with pytest.raises(CoordinatesRequiredException):
         input_data = InputData(
             "test",
             site_a_coordinates=None,

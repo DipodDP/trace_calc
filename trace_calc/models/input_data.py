@@ -13,11 +13,11 @@ class InputData:
     """
     Model that holds expected input data.
 
-    Filename to store the data, regional climate losses,
+    Name of stored data, regional climate losses,
     sites coordinates:a tuple of coordinates (lat, lon), antennas heights
     """
 
-    path_filename: str
+    path_name: str
     climate_losses = 0.0
     site_a_coordinates: Coordinates | None = None
     site_b_coordinates: Coordinates | None = None

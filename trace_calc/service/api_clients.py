@@ -14,12 +14,7 @@ from progressbar import ProgressBar
 
 from trace_calc.models.input_data import Coordinates
 from trace_calc.service.base import BaseDeclinationsApiClient, BaseElevationsApiClient
-
-
-class APIException(Exception):
-    """Custom exception when API data cannot be retrieved."""
-
-    pass
+from trace_calc.service.exceptions import APIException
 
 
 class SyncElevationsApiClient(BaseElevationsApiClient):

@@ -7,6 +7,7 @@ from trace_calc.models.input_data import InputData
 from trace_calc.models.path import PathData
 from trace_calc.service.base import BaseElevationsApiClient
 from trace_calc.service.coordinates_service import CoordinatesService
+from trace_calc.service.exceptions import CoordinatesRequiredException
 
 
 class PathProfileService:
@@ -24,7 +25,7 @@ class PathProfileService:
             input_data.site_a_coordinates is None
             or input_data.site_b_coordinates is None
         ):
-            raise ValueError("Cannot fetch elevations without coordinates")
+            raise CoordinatesRequiredException("Cannot fetch elevations without coordinates")
         self.coord_a = input_data.site_a_coordinates
         self.coord_b = input_data.site_b_coordinates
 

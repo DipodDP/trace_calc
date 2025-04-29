@@ -8,6 +8,7 @@ from trace_calc.service.api_clients import (
     AsyncElevationsApiClient,
     AsyncMagDeclinationApiClient,
 )
+from trace_calc.service.exceptions import CoordinatesRequiredException
 from trace_calc.service.path_storage import FilePathStorage
 from trace_calc.service.process import AnalyzerService, GeoDataService
 
@@ -36,7 +37,7 @@ class Application:
     def __init__(self):
         self.input_handler = UserInputHandler()
 
-    async def run(self, service: AnalyzerService, geo_data_service: GeoDataService):
+    async def run(self, analyzer_service: AnalyzerService, geo_data_service: GeoDataService):
         stored_filename = input("Enter stored file name (without .path): ")
         file_path = Path(stored_filename + ".path")
         antennas_heights = {
@@ -59,8 +60,8 @@ class Application:
 
         print("\n___________Calculation results___________\n")
         try:
-            result = await service.process(input_data)
-        except ValueError:
+            result = await analyzer_service.process(input_data)
+        except CoordinatesRequiredException:
             print(
                 f"Coordinates are required for calculation. Enter them manually. The file {file_path} has no stored data."
             )
@@ -70,13 +71,13 @@ class Application:
             input_data.site_b_coordinates = self.input_handler.get_coordinates(
                 'Input site "B" coordinates (format: -123.456 12.345): ',
             )
-            result = await service.process(input_data)
+            result = await analyzer_service.process(input_data)
             # result = await service.process(input_data, **antennas_heights)
 
         print("Analysis result:", result)
         geo_data = await geo_data_service.process(
-            service.path_data.coordinates[0],
-            service.path_data.coordinates[-1],
+            analyzer_service.path_data.coordinates[0],
+            analyzer_service.path_data.coordinates[-1],
         )
         print("Geo data:", geo_data)
 
