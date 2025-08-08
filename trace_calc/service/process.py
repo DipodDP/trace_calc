@@ -114,20 +114,22 @@ class GeoDataService:
         if not self.declinations_api_client:
             raise RuntimeError("Elevations API client is missing!")
 
-        mag_declinations = await self.declinations_api_client.fetch_declinations((
-            coord_a,
-            coord_b,
-        ))
+        mag_declinations = await self.declinations_api_client.fetch_declinations(
+            (
+                coord_a,
+                coord_b,
+            )
+        )
         distance = CoordinatesService(coord_a, coord_b).get_distance()
         azimuth_a_b = CoordinatesService(coord_a, coord_b).get_azimuth()
         azimuth_b_a = CoordinatesService(coord_b, coord_a).get_azimuth()
 
         return GeoData(
             distance=distance,
-            mag_declination_a=mag_declinations[0],
-            mag_declination_b=mag_declinations[1],
-            true_azimuth_a_b=azimuth_a_b,
-            true_azimuth_b_a=azimuth_b_a,
-            mag_azimuth_a_b=azimuth_a_b - mag_declinations[0],
-            mag_azimuth_b_a=azimuth_b_a - mag_declinations[1],
+            mag_declination_a=round(mag_declinations[0], 2),
+            mag_declination_b=round(mag_declinations[1], 2),
+            true_azimuth_a_b=round(azimuth_a_b, 2),
+            true_azimuth_b_a=round(azimuth_b_a, 2),
+            mag_azimuth_a_b=round(azimuth_a_b - mag_declinations[0], 2),
+            mag_azimuth_b_a=round(azimuth_b_a - mag_declinations[1], 2),
         )
