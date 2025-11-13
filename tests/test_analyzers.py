@@ -1,5 +1,5 @@
 from trace_calc.models.input_data import InputData
-from trace_calc.service.analyzers import GrozaAnalyzer, SosnikAnalyzer
+from trace_calc.services.analyzers import GrozaAnalyzer, SosnikAnalyzer
 from .test_hca_calculator import test_profile
 
 

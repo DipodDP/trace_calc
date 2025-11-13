@@ -1,7 +1,7 @@
 import numpy as np
 from trace_calc.models.input_data import InputData
 from trace_calc.models.path import PathData
-from trace_calc.service.hca_calculator import HCACalculatorCC, HCACalculatorFFT
+from trace_calc.services.hca_calculator import HCACalculatorCC, HCACalculatorFFT
 
 # Set fixed seed for reproducibility
 np.random.seed(42)

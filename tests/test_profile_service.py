@@ -2,16 +2,13 @@ import numpy as np
 import pytest
 
 from trace_calc.models.input_data import Coordinates, InputData
-from trace_calc.service.base import BaseElevationsApiClient
-from trace_calc.service.exceptions import CoordinatesRequiredException
-from trace_calc.service.profile_service import PathProfileService
+from trace_calc.services.base import BaseElevationsApiClient
+from trace_calc.services.exceptions import CoordinatesRequiredException
+from trace_calc.services.profile_service import PathProfileService
+from tests.mocks import MockElevationsApiClient
 
 
-# Dummy elevations API client that simulates an async API call
-class DummyElevationsApiClient(BaseElevationsApiClient):
-    async def fetch_elevations(self, coord_vect, block_size):
-        # Return dummy elevation data based on the number of coordinates
-        return np.linspace(100, 200, coord_vect.shape[0])
+
 
 
 # Parametrized test cases for linspace_coord edge cases.
@@ -40,7 +37,7 @@ def test_linspace_coord_edge_cases(site_a, site_b, expected_behavior):
     )
     service = PathProfileService(
         input_data,
-        DummyElevationsApiClient("test_url", "test_key"),
+        MockElevationsApiClient(api_url="", api_key=""),
         block_size=10,
         resolution=1,
     )
@@ -97,7 +94,7 @@ def test_initialization_error():
             site_a_coordinates=None,
             site_b_coordinates=None,
         )
-        PathProfileService(input_data, DummyElevationsApiClient("test_api", "test_key"))
+        PathProfileService(input_data, MockElevationsApiClient(api_url="", api_key=""))
 
 
 @pytest.mark.asyncio
@@ -110,7 +107,7 @@ async def test_get_profile():
     )
     service = PathProfileService(
         input_data,
-        DummyElevationsApiClient("test_url", "test_key"),
+        MockElevationsApiClient(api_url="", api_key=""),
         block_size=50,
         resolution=0.5,
     )
