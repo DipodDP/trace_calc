@@ -11,14 +11,26 @@ python = "^3.10"
 matplotlib = "^3.7.1"
 numpy = "^1.25.0"
 environs = "^9.5.0"
+marshmallow = "<4.0"
 requests = "^2.31.0"
 progressbar2 = "^4.5.0"
 aiofiles = "^24.1.0"
 httpx = "^0.28.1"
+tenacity = "^8.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest-asyncio = "^0.26.0"
+mypy = "^1.10.0"
+
+[tool.mypy]
+strict = true
+plugins = "numpy.typing.mypy_plugin"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:The '__version_info__' attribute is deprecated:DeprecationWarning",
+]

@@ -1,8 +1,9 @@
 import aiofiles
 import numpy as np
+from numpy.typing import NDArray
 
 from trace_calc.models.path import PathData
-from trace_calc.service.base import BasePathStorage
+from trace_calc.services.base import BasePathStorage
 
 
 class FilePathStorage(BasePathStorage):
@@ -12,8 +13,8 @@ class FilePathStorage(BasePathStorage):
 
         tmp = np.frombuffer(content).reshape((-1, 4))
         coordinates = tmp[:, :2]
-        distances = tmp[:, 2]
-        elevations = tmp[:, 3]
+        distances: NDArray[np.float64] = tmp[:, 2]
+        elevations: NDArray[np.float64] = tmp[:, 3]
         return PathData(coordinates, distances, elevations)
 
     async def store(self, filename: str, path_data: PathData) -> None:

@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy.typing import NDArray
 
 from trace_calc.models.path import ProfileData
 
@@ -16,7 +17,7 @@ class ProfilePlotter:
         """
         self.calc = calculations
 
-    def plot(self, distances: np.ndarray, path_filename: str):
+    def plot(self, distances: NDArray[np.float64], path_filename: str) -> None:
         """
         Generate and save a two-panel profile chart.
 
@@ -34,6 +35,8 @@ class ProfilePlotter:
         fig, axes = plt.subplots(2, 1, figsize=(19.20, 5.4))
 
         # 1. Plain profile
+        elevations: NDArray[np.float64]
+        zero: NDArray[np.float64]
         elevations, zero = self.calc.plain
         axes[0].plot(distances, elevations, "g", label="Elevation")
         axes[0].fill_between(distances, elevations, zero, facecolor="g", alpha=0.2)
@@ -46,34 +49,55 @@ class ProfilePlotter:
         )
 
         # 2. Curved profile and lines of sight
+        elevations_curved: NDArray[np.float64]
+        zero_curved: NDArray[np.float64]
         elevations_curved, zero_curved = self.calc.curved
+
+        # Shift baseline to start at 0 for plotting
+        shift = zero_curved[0]
+        zero_curved_for_plot = zero_curved - shift
+        elevations_curved_for_plot = elevations_curved - shift
+
         sight_1, sight_2, cross = self.calc.lines_of_sight
-        axes[1].plot(distances, elevations_curved, "g", label="Curved Elevation")
+        sight_1_for_plot = np.polyval(sight_1, distances.astype(float)) - shift
+        sight_2_for_plot = np.polyval(sight_2, distances.astype(float)) - shift
+        cross_for_plot = (cross[0], cross[1] - shift)
+
+        axes[1].plot(
+            distances, elevations_curved_for_plot, "g", label="Curved Elevation"
+        )
         axes[1].fill_between(
-            distances, elevations_curved, zero_curved, facecolor="g", alpha=0.2
+            distances,
+            elevations_curved_for_plot,
+            zero_curved_for_plot,
+            facecolor="g",
+            alpha=0.2,
         )
         axes[1].plot(
             distances,
-            np.polyval(sight_1, distances),
+            sight_1_for_plot,
             lw=1.4,
             linestyle="--",
             label="Sight Line A",
         )
         axes[1].plot(
             distances,
-            np.polyval(sight_2, distances),
+            sight_2_for_plot,
             lw=1.4,
             linestyle="--",
             label="Sight Line B",
         )
-        axes[1].scatter(*cross, zorder=5, label="Intersection")
+        axes[1].scatter(*cross_for_plot, zorder=5, label="Intersection")
         axes[1].grid(True)
 
-        y_min = min(elevations_curved.min(), zero_curved.min())
-        y_max = cross[1]
-        y_range = y_max - y_min
+        y_max = cross_for_plot[1] * 1.1
+
+        lower_limit = elevations_curved_for_plot.min() - 20
+        if lower_limit > -10:
+            lower_limit = -10
+
         axes[1].set_xlim(distances[0], distances[-1])
-        axes[1].set_ylim(y_min - y_range / 10, y_max + y_range / 10)
+        axes[1].set_ylim(bottom=lower_limit, top=y_max + 20)
 
         fig.savefig(f"{path_filename}.png", dpi=300, facecolor="mintcream")
         plt.close(fig)

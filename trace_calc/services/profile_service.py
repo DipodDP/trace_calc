@@ -3,11 +3,12 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from trace_calc.domain.units import Kilometers
 from trace_calc.models.input_data import InputData
 from trace_calc.models.path import PathData
-from trace_calc.service.base import BaseElevationsApiClient
-from trace_calc.service.coordinates_service import CoordinatesService
-from trace_calc.service.exceptions import CoordinatesRequiredException
+from trace_calc.services.base import BaseElevationsApiClient
+from trace_calc.services.coordinates_service import CoordinatesService
+from trace_calc.services.exceptions import CoordinatesRequiredException
 
 
 class PathProfileService:
@@ -15,8 +16,8 @@ class PathProfileService:
         self,
         input_data: InputData,
         elevations_api_client: BaseElevationsApiClient,
-        block_size=256,
-        resolution=0.5,
+        block_size: int = 256,
+        resolution: float = 0.5,
     ):
         self.elevations_api_client = elevations_api_client
         self.block_size = block_size
@@ -25,7 +26,9 @@ class PathProfileService:
             input_data.site_a_coordinates is None
             or input_data.site_b_coordinates is None
         ):
-            raise CoordinatesRequiredException("Cannot fetch elevations without coordinates")
+            raise CoordinatesRequiredException(
+                "Cannot fetch elevations without coordinates"
+            )
         self.coord_a = input_data.site_a_coordinates
         self.coord_b = input_data.site_b_coordinates
 
@@ -35,7 +38,7 @@ class PathProfileService:
         """
 
         coordinates_service = CoordinatesService(self.coord_a, self.coord_b)
-        full_distance = coordinates_service.get_distance()
+        full_distance: Kilometers = coordinates_service.get_distance()
 
         # Extend coordinates longitude if crossing 180 degree to create linear space vector
         coord_a, coord_b = coordinates_service.get_extended_coordinates()
@@ -64,19 +67,15 @@ class PathProfileService:
         points_num = self.coord_vect.shape[0]
         print(f"Coordinates: {self.coord_a} {self.coord_b}")
 
+        coordinates_service = CoordinatesService(self.coord_a, self.coord_b)
+        full_distance: Kilometers = coordinates_service.get_distance()
+
         path_profile = PathData(
             coordinates=self.coord_vect,
-            distances=np.zeros(points_num),
-            elevations=np.zeros(points_num),
+            distances=np.linspace(0, full_distance, points_num, dtype=np.float64),
+            elevations=np.zeros(points_num, dtype=np.float64),
         )
 
-        # Calculate cumulative distance along the coordinate vector
-        path_profile.distances[0] = 0.0
-        for i in range(1, points_num):
-            coordinates_service = CoordinatesService(
-                self.coord_vect[0], self.coord_vect[i]
-            )
-            path_profile.distances[i] = coordinates_service.get_distance()
         path_profile.elevations = await self.elevations_api_client.fetch_elevations(
             self.coord_vect, self.block_size
         )

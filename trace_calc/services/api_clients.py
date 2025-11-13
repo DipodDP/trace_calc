@@ -4,7 +4,7 @@ import re
 import xml.dom.minidom
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import requests
@@ -12,13 +12,16 @@ from httpx import AsyncClient, QueryParams, Response
 from numpy.typing import NDArray
 from progressbar import ProgressBar
 
+from trace_calc.domain.units import Angle, Degrees, Elevation
 from trace_calc.models.input_data import Coordinates
-from trace_calc.service.base import BaseDeclinationsApiClient, BaseElevationsApiClient
-from trace_calc.service.exceptions import APIException
+from trace_calc.services.base import BaseDeclinationsApiClient, BaseElevationsApiClient
+from trace_calc.services.exceptions import APIException
 
 
 class SyncElevationsApiClient(BaseElevationsApiClient):
-    def elevations_api_request(self, coord_vect_block: Iterable):
+    def elevations_api_request(
+        self, coord_vect_block: Iterable[Coordinates]
+    ) -> list[Elevation]:
         headers = {
             "X-RapidAPI-Host": self.api_url.split("/")[2],  # Getting host from API URL
             "X-RapidAPI-Key": self.api_key,
@@ -46,7 +49,7 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
                 f"{response.status_code} - {': '.join(list(resp.values()))}"
             )
 
-        return resp
+        return [Elevation(e) for e in resp]
 
     async def fetch_elevations(
         self, coord_vect: NDArray[np.floating[Any]], block_size: int
@@ -76,7 +79,9 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
 
 
 class AsyncElevationsApiClient(BaseElevationsApiClient):
-    async def elevations_api_request(self, coord_vect_block: Iterable) -> list[float]:
+    async def elevations_api_request(
+        self, coord_vect_block: Iterable[Coordinates]
+    ) -> list[Elevation]:
         """Asynchronous API request with httpx"""
         headers = {
             "X-RapidAPI-Host": self.api_url.split("/")[2],  # Getting host from API URL
@@ -107,7 +112,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
                     f"{response.status_code} - {': '.join(error_data.values())}"
                 )
 
-            return response.json()
+            return [Elevation(e) for e in response.json()]
 
     async def fetch_elevations(
         self, coord_vect: NDArray[np.floating[Any]], block_size: int
@@ -130,7 +135,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
 
         tasks = [self.elevations_api_request(block) for block in coord_vect_blocks]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        successes = []
+        successes: list[list[Elevation]] = []
         errors = []
 
         for idx, result in enumerate(results):
@@ -147,48 +152,58 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         if errors:
             raise APIException(errors)
 
-        elevations = np.append(*successes)
-        return elevations
+        if not successes:
+            return np.array([], dtype=np.float64)
+
+        return np.concatenate([np.array(s, dtype=np.float64) for s in successes])
 
 
 class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
     @staticmethod
-    async def _parse_xml(response: Response) -> float:
+    async def _parse_xml(response: Response) -> Angle:
         """
         Process XML file to get only declination info
         """
 
-        def get_text(nodelist):
+        def get_text(nodelist: list[xml.dom.minidom.Node]) -> str:
             rc = []
             for node in nodelist:
                 if node.nodeType == node.TEXT_NODE:
-                    rc.append(node.data)
+                    if node.nodeValue is not None:
+                        rc.append(node.nodeValue)
             return "".join(rc)
 
         xml_response = await response.aread()
         # Process XML file into object tree and get only declination info
         dom = xml.dom.minidom.parseString(xml_response)
-        my_string = get_text(dom.getElementsByTagName("declination")[0].childNodes)
+        my_string = get_text(
+            cast(
+                list[xml.dom.minidom.Node],
+                dom.getElementsByTagName("declination")[0].childNodes,
+            )
+        )
         # At this point the string still contains some formatting, this removes it
         declination = float(re.findall(r"[-+]?\d*\.\d+|\d+", my_string)[0])
         # Output formatting and append line to declination file
         await response.aclose()
-        return declination
+        return Angle(Degrees(declination))
 
-    async def declination_api_request(self, coordinate: Coordinates) -> float:
+    async def declination_api_request(self, coordinate: Coordinates) -> Angle:
         """Magnet Declination API request with httpx"""
 
         month = datetime.now().month
         latitude = coordinate[0]
         longitude = coordinate[1]
 
-        params = QueryParams({
-            "lat1": latitude,
-            "lon1": longitude,
-            "key": self.api_key,
-            "resultFormat": "xml",
-            "startMonth": month,
-        })
+        params = QueryParams(
+            {
+                "lat1": latitude,
+                "lon1": longitude,
+                "key": self.api_key,
+                "resultFormat": "xml",
+                "startMonth": month,
+            }
+        )
         print("------- Start fetching magnet declination -------")
         async with AsyncClient() as client:
             response = await client.get(self.api_url, params=params, timeout=10.0)
@@ -212,7 +227,7 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
 
     async def fetch_declinations(
         self, coordinates: Iterable[Coordinates]
-    ) -> list[float]:
+    ) -> list[Angle]:
         """
         Asynchronously retrieves magnet declinations data for the given coordinates.
         """

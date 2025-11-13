@@ -3,19 +3,20 @@ from pathlib import Path
 from trace_calc.models.input_data import Coordinates, InputData
 from environs import Env
 
-from trace_calc.service.analyzers import GrozaAnalyzer
-from trace_calc.service.api_clients import (
+from trace_calc.domain.units import Meters
+from trace_calc.services.analyzers import GrozaAnalyzer
+from trace_calc.services.api_clients import (
     AsyncElevationsApiClient,
     AsyncMagDeclinationApiClient,
 )
-from trace_calc.service.exceptions import CoordinatesRequiredException
-from trace_calc.service.path_storage import FilePathStorage
-from trace_calc.service.process import AnalyzerService, GeoDataService
+from trace_calc.services.exceptions import CoordinatesRequiredException
+from trace_calc.services.path_storage import FilePathStorage
+from trace_calc.services.process import AnalyzerService, GeoDataService
 
 
 # --- Input Handling ---
 class UserInputHandler:
-    def get_coordinates(self, prompt: str):
+    def get_coordinates(self, prompt: str) -> Coordinates:
         try:
             coordinates = (float(coord) for coord in input(prompt).split()[:2])
         except ValueError:
@@ -24,23 +25,25 @@ class UserInputHandler:
             )
         return Coordinates(*coordinates)
 
-    def get_antenna_heights(self, prompt: str) -> int | None:
+    def get_antenna_heights(self, prompt: str) -> Meters | None:
         try:
             height = input(prompt)
-            return int(height) if height else None
+            return Meters(int(height)) if height else None
         except ValueError:
             raise ValueError("Please enter a valid integer.")
 
 
 # --- Application Orchestration ---
 class Application:
-    def __init__(self):
+    def __init__(self) -> None:
         self.input_handler = UserInputHandler()
 
-    async def run(self, analyzer_service: AnalyzerService, geo_data_service: GeoDataService):
+    async def run(
+        self, analyzer_service: AnalyzerService, geo_data_service: GeoDataService
+    ) -> None:
         stored_filename = input("Enter stored file name (without .path): ")
         file_path = Path(stored_filename + ".path")
-        antennas_heights = {
+        antennas_heights: dict[str, Meters] = {
             k: v
             for k, v in {
                 "antenna_a_height": self.input_handler.get_antenna_heights(
@@ -54,10 +57,18 @@ class Application:
         }
 
         input_data = InputData(stored_filename)
-        # input_data = InputData(stored_filename, **antennas_heights)
+        if (
+            "antenna_a_height" in antennas_heights
+            and antennas_heights["antenna_a_height"] is not None
+        ):
+            input_data.antenna_a_height = antennas_heights["antenna_a_height"]
+        if (
+            "antenna_b_height" in antennas_heights
+            and antennas_heights["antenna_b_height"] is not None
+        ):
+            input_data.antenna_b_height = antennas_heights["antenna_b_height"]
 
         # Process the data: fetch additional info, calculate, and store the result.
-
         print("\n___________Calculation results___________\n")
         try:
             result = await analyzer_service.process(input_data)
@@ -75,10 +86,15 @@ class Application:
             # result = await service.process(input_data, **antennas_heights)
 
         print("Analysis result:", result)
+        coord_a = Coordinates(*analyzer_service.path_data.coordinates[0])
+        coord_b = Coordinates(*analyzer_service.path_data.coordinates[-1])
+
         geo_data = await geo_data_service.process(
-            analyzer_service.path_data.coordinates[0],
-            analyzer_service.path_data.coordinates[-1],
+            coord_a,
+            coord_b,
         )
+        print('Site "A" corrdinates:', coord_a)
+        print('Site "B" corrdinates:', coord_b)
         print("Geo data:", geo_data)
 
 

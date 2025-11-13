@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from trace_calc.domain.units import Angle, Meters
 from trace_calc.models.input_data import Coordinates, InputData
 from trace_calc.models.path import HCAData, PathData
 
@@ -59,7 +60,7 @@ class BaseDeclinationsApiClient(BaseApiClient):
     @abstractmethod
     async def fetch_declinations(
         self, coordinates: Iterable[Coordinates]
-    ) -> list[float]:
+    ) -> list[Angle]:
         """
         Fetch magnet declinations for the given coordinates.
         This method must be implemented by subclasses.
@@ -69,8 +70,8 @@ class BaseDeclinationsApiClient(BaseApiClient):
 
 class BaseHCACalculator(ABC):
     def __init__(self, profile: PathData, input_data: InputData):
-        self.antenna_a_height = input_data.antenna_a_height
-        self.antenna_b_height = input_data.antenna_b_height
+        self.antenna_a_height: Meters = input_data.antenna_a_height
+        self.antenna_b_height: Meters = input_data.antenna_b_height
         self.elevations = profile.elevations
         self.distances = profile.distances
         self.input_data = input_data
@@ -86,7 +87,7 @@ class BaseSpeedCalculator(ABC):
     """
 
     @abstractmethod
-    def calculate_speed(self, *args, **kwargs) -> tuple[float, ...]:
+    def calculate_speed(self, *args: Any, **kwargs: Any) -> tuple[float, ...]:
         """
         Perform calculations based on provided parameters.
 
@@ -95,15 +96,20 @@ class BaseSpeedCalculator(ABC):
         pass
 
 
-class BaseAnalyzer(BaseSpeedCalculator, BaseHCACalculator):
+class BaseAnalyzer(BaseSpeedCalculator, ABC):
     """
     Abstract base class for performing analysis.
     """
 
+    def __init__(self, profile: PathData, input_data: InputData):
+        self.profile = profile
+        self.input_data = input_data
+
     @abstractmethod
-    def analyze(self, /, **kwargs: Any) -> dict:
+    def analyze(self, /, **kwargs: Any) -> dict[str, Any]:
         """
-        Asynchronously perform analysis and return the results as a dictionary.
+        Perform analysis using speed and HCA calculators,
+        and return the results as a dictionary.
 
         :return: Dictionary of analysis results.
         """

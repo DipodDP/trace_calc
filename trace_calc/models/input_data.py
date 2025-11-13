@@ -2,6 +2,8 @@ from typing import NamedTuple
 
 from dataclasses import dataclass
 
+from trace_calc.domain.units import Loss, Meters
+
 
 class Coordinates(NamedTuple):
     lat: float
@@ -18,8 +20,8 @@ class InputData:
     """
 
     path_name: str
-    climate_losses = 0.0
+    climate_losses: Loss = Loss(0.0)
     site_a_coordinates: Coordinates | None = None
     site_b_coordinates: Coordinates | None = None
-    antenna_a_height = 2
-    antenna_b_height = 2
+    antenna_a_height: Meters = Meters(2)
+    antenna_b_height: Meters = Meters(2)

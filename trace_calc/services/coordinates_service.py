@@ -1,6 +1,8 @@
 import math
 import numpy as np
+from trace_calc.domain.units import Angle, Kilometers, Meters, Degrees
 from trace_calc.models.input_data import Coordinates
+from trace_calc.services.validators import validate_coordinates, validate_arccos_domain
 
 
 class CoordinatesService:
@@ -18,8 +20,13 @@ class CoordinatesService:
         """
         Precompute values for two coordinates given in decimal degrees.
         """
+        # Validate input coordinates
+        validate_coordinates(coord_a)
+        validate_coordinates(coord_b)
+
         # Radius of the Earth (in meters)
-        self.earth_radius = 6372795
+        # Note: Spherical approximation. WGS84 semi-major axis is 6,378,137 m
+        self.earth_radius: Meters = Meters(6372795)
         self.coord_a = coord_a
         self.coord_b = coord_b
 
@@ -42,24 +49,27 @@ class CoordinatesService:
 
     def get_distance(
         self,
-    ) -> float:
+    ) -> Kilometers:
         """
         Calculates the distance between two coordinates in kilometers.
         """
-        return self.earth_radius * self.get_angle() * 0.001
+        return Kilometers(self.earth_radius * self.get_angle())
 
     def get_angle(
         self,
-    ):
+    ) -> float:
         """
         Calculates the angular separation (in radians) between two coordinates.
         """
-        return np.arccos(
+        cos_angle = (
             self.sin_lat_1 * self.sin_lat_2
             + self.cos_lat_1 * self.cos_lat_2 * self.cos_delta
         )
+        # Protect against floating-point errors pushing cos_angle outside [-1, 1]
+        cos_angle = validate_arccos_domain(cos_angle)
+        return float(np.arccos(cos_angle))
 
-    def get_azimuth(self) -> float:
+    def get_azimuth(self) -> Angle:
         """
         Calculate the initial bearing (forward azimuth) from point A to point B.
 
@@ -85,9 +95,9 @@ class CoordinatesService:
         z_norm = self.normalize_longitude_180(z)
         z_rad = -math.radians(z_norm)
         angle_rad = z_rad - ((2 * math.pi) * math.floor((z_rad / (2 * math.pi))))
-        angle_degree = (angle_rad * 180.0) / math.pi
+        angle_degree = Degrees(angle_rad * 180.0 / math.pi)
 
-        return angle_degree
+        return Angle(angle_degree)
 
     def get_extended_coordinates(
         self,
