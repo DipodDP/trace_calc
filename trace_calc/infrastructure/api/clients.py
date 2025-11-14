@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 import xml.dom.minidom
 from collections.abc import Iterable
@@ -12,15 +13,20 @@ from httpx import AsyncClient, QueryParams, Response
 from numpy.typing import NDArray
 from progressbar import ProgressBar
 
-from trace_calc.domain.units import Angle, Degrees, Elevation
-from trace_calc.models.input_data import Coordinates
-from trace_calc.services.base import BaseDeclinationsApiClient, BaseElevationsApiClient
-from trace_calc.services.exceptions import APIException
+from trace_calc.domain.models.units import Angle, Degrees, Elevation
+from trace_calc.domain.models.coordinates import Coordinates
+from trace_calc.application.services.base import (
+    BaseDeclinationsApiClient,
+    BaseElevationsApiClient,
+)
+from trace_calc.domain.exceptions import APIException
+
+logger = logging.getLogger(__name__)
 
 
 class SyncElevationsApiClient(BaseElevationsApiClient):
     def elevations_api_request(
-        self, coord_vect_block: Iterable[Coordinates]
+        self, coord_vect_block: NDArray[np.floating[Any]]
     ) -> list[Elevation]:
         headers = {
             "X-RapidAPI-Host": self.api_url.split("/")[2],  # Getting host from API URL
@@ -32,12 +38,12 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
             querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
         querystring["points"] = querystring["points"][:-1] + "]"
 
-        print("------- Start fetching block of elevations -------")
-        print(f"Query string: {querystring['points'][:80]}...")
+        logger.info("------- Start fetching block of elevations -------")
+        logger.debug(f"Query string: {querystring['points'][:80]}...")
         response = requests.request(
             "GET", self.api_url, headers=headers, params=querystring
         )
-        print("------- Got response -------", response.status_code)
+        logger.info("------- Got response -------", response.status_code)
 
         try:
             resp = json.loads(response.text)
@@ -62,7 +68,7 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
             f"Supports only {block_size} wide requests"
         )
         blocks_num = coord_vect.shape[0] // block_size
-        print("Retrieving elevation data...")
+        logger.info("Retrieving elevation data...")
         bar = ProgressBar(max_value=blocks_num).start()
 
         # Initialize an empty NumPy array with dtype float64
@@ -80,7 +86,7 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
 
 class AsyncElevationsApiClient(BaseElevationsApiClient):
     async def elevations_api_request(
-        self, coord_vect_block: Iterable[Coordinates]
+        self, coord_vect_block: NDArray[np.floating[Any]]
     ) -> list[Elevation]:
         """Asynchronous API request with httpx"""
         headers = {
@@ -93,14 +99,15 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
         querystring["points"] = querystring["points"][:-1] + "]"
 
-        print("------- Start fetching block of elevations -------")
-        print(f"Query string: {querystring['points'][:80]}...")
+        logger.info("------- Start fetching block of elevations -------")
+        logger.debug(f"Query string: {querystring['points'][:80]}...")
 
         async with AsyncClient() as client:
             response = await client.get(
                 self.api_url, headers=headers, params=querystring, timeout=10.0
             )
-            print("------- Got response -------", response.status_code)
+            logger.info(f"------- Got response ------- {response.status_code}")
+            logger.debug(f"Request URL: {response.request.url}")
 
             if not response.is_success:
                 try:
@@ -120,6 +127,9 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         """
         Asynchronously retrieves elevation data in blocks for the given coordinate vector.
         """
+        logger.info(
+            f"fetch_elevations called with coord_vect.shape={coord_vect.shape}, block_size={block_size}"
+        )
 
         if coord_vect.shape[0] % block_size != 0:
             raise ValueError(
@@ -128,12 +138,18 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
 
         blocks_num = coord_vect.shape[0] // block_size
 
-        print("Retrieving data...")
+        logger.info(
+            f"Retrieving elevation data for {coord_vect.shape[0]} coordinates in {blocks_num} blocks..."
+        )
         coord_vect_blocks = [
             coord_vect[n * block_size : (n + 1) * block_size] for n in range(blocks_num)
         ]
+        logger.info(
+            f"Created {len(coord_vect_blocks)} block(s) with shapes: {[block.shape for block in coord_vect_blocks]}"
+        )
 
         tasks = [self.elevations_api_request(block) for block in coord_vect_blocks]
+        logger.info(f"Created {len(tasks)} task(s) for async execution")
         results = await asyncio.gather(*tasks, return_exceptions=True)
         successes: list[list[Elevation]] = []
         errors = []
@@ -147,7 +163,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             else:
                 successes.append(result)
 
-        print(f"---- Got {len(results)} blocks -----")
+        logger.info(f"---- Got {len(results)} blocks -----")
 
         if errors:
             raise APIException(errors)
@@ -204,11 +220,11 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
                 "startMonth": month,
             }
         )
-        print("------- Start fetching magnet declination -------")
+        logger.info("------- Start fetching magnet declination -------")
         async with AsyncClient() as client:
             response = await client.get(self.api_url, params=params, timeout=10.0)
 
-            print(
+            logger.info(
                 f"------- Got response for {response.request.url} -------",
                 response.status_code,
             )
@@ -232,7 +248,7 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
         Asynchronously retrieves magnet declinations data for the given coordinates.
         """
 
-        print("Retrieving magnet declination data...")
+        logger.info("Retrieving magnet declination data...")
 
         tasks = [self.declination_api_request(coordinate) for coordinate in coordinates]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -248,7 +264,7 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
             else:
                 declinations.append(result)
 
-        print(f"---- Got {len(results)} blocks -----")
+        logger.info(f"---- Got {len(results)} blocks -----")
 
         if errors:
             raise APIException(errors)

@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 from dataclasses import dataclass
 
-from trace_calc.domain.units import Loss, Meters
+from .units import Loss, Meters
 
 
 class Coordinates(NamedTuple):
@@ -20,6 +20,7 @@ class InputData:
     """
 
     path_name: str
+    frequency_mhz: float = 4500.0
     climate_losses: Loss = Loss(0.0)
     site_a_coordinates: Coordinates | None = None
     site_b_coordinates: Coordinates | None = None

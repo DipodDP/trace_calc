@@ -2,9 +2,9 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Any
 
-from trace_calc.domain.units import Angle, Degrees
-from trace_calc.models.input_data import Coordinates
-from trace_calc.services.base import BaseDeclinationsApiClient, BaseElevationsApiClient
+from trace_calc.domain.models.units import Angle, Degrees # Corrected import
+from trace_calc.domain.models.coordinates import Coordinates # Corrected import
+from trace_calc.application.services.base import BaseDeclinationsApiClient, BaseElevationsApiClient # Corrected import
 
 
 class MockMagDeclinationApiClient(BaseDeclinationsApiClient):

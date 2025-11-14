@@ -4,7 +4,7 @@ from typing import Any, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.units import Angle, Kilometers
+from .units import Angle, Kilometers
 
 
 @dataclass(slots=True)

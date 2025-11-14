@@ -5,9 +5,9 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.units import Angle, Meters
-from trace_calc.models.input_data import Coordinates, InputData
-from trace_calc.models.path import HCAData, PathData
+from trace_calc.domain.models.units import Angle, Meters
+from trace_calc.domain.models.coordinates import Coordinates, InputData
+from trace_calc.domain.models.path import HCAData, PathData
 
 
 class BasePathStorage(ABC):

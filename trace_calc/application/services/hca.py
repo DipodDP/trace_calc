@@ -6,10 +6,10 @@ from numpy.fft import fft, ifft
 from numpy.typing import NDArray
 
 from trace_calc.domain.curvature import get_empirical_curvature_correction
-from trace_calc.domain.units import Angle, Degrees, Elevation, Kilometers, Meters
-from trace_calc.models.input_data import InputData
-from trace_calc.models.path import HCAData, PathData
-from trace_calc.services.base import BaseHCACalculator
+from trace_calc.domain.models.units import Angle, Degrees, Elevation, Kilometers, Meters
+from trace_calc.domain.models.coordinates import InputData
+from trace_calc.domain.models.path import HCAData, PathData
+from .base import BaseHCACalculator
 
 
 class ElevationsFilterFFT:

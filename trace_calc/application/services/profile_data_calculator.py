@@ -2,10 +2,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from trace_calc.domain.curvature import apply_geometric_curvature
-from trace_calc.domain.units import Meters
-from trace_calc.models.input_data import InputData
-from trace_calc.models.path import PathData, ProfileData, ProfileViewData
-from trace_calc.services.hca_calculator import HCACalculatorCC
+from trace_calc.domain.models.units import Meters
+from trace_calc.domain.models.coordinates import InputData
+from trace_calc.domain.models.path import PathData, ProfileData, ProfileViewData
+from trace_calc.application.services.hca import HCACalculatorCC
 
 
 class ProfileDataCalculator:

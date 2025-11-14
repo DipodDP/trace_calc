@@ -1,7 +1,7 @@
 import pytest
-from trace_calc.services.process import GeoDataService
+from trace_calc.application.orchestration import GeoDataService
 from tests.mocks import MockMagDeclinationApiClient
-from trace_calc.models.input_data import Coordinates
+from trace_calc.domain.models.coordinates import Coordinates
 
 
 @pytest.mark.asyncio

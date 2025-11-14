@@ -1,12 +1,11 @@
 import numpy as np
 import pytest
 
-from trace_calc.models.input_data import Coordinates, InputData
-from trace_calc.services.base import BaseElevationsApiClient
-from trace_calc.services.exceptions import CoordinatesRequiredException
-from trace_calc.services.profile_service import PathProfileService
 from tests.mocks import MockElevationsApiClient
-
+from trace_calc.domain.models.coordinates import Coordinates, InputData
+from trace_calc.application.services.base import BaseElevationsApiClient
+from trace_calc.domain.exceptions import CoordinatesRequiredException
+from trace_calc.application.services.profile import PathProfileService
 
 
 
@@ -32,6 +31,7 @@ from tests.mocks import MockElevationsApiClient
 def test_linspace_coord_edge_cases(site_a, site_b, expected_behavior):
     input_data = InputData(
         "test",
+        frequency_mhz=1000.0,
         site_a_coordinates=site_a,
         site_b_coordinates=site_b,
     )
@@ -91,6 +91,7 @@ def test_initialization_error():
     with pytest.raises(CoordinatesRequiredException):
         input_data = InputData(
             "test",
+            frequency_mhz=1000.0,
             site_a_coordinates=None,
             site_b_coordinates=None,
         )
@@ -102,6 +103,7 @@ async def test_get_profile():
     # Test the asynchronous get_profile method.
     input_data = InputData(
         "test",
+        frequency_mhz=1000.0,
         site_a_coordinates=Coordinates(10, 20),
         site_b_coordinates=Coordinates(20, 30),
     )

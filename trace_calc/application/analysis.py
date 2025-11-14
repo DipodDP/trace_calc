@@ -1,54 +1,57 @@
+import logging
+import os
 import math
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.units import Angle, Kilometers, Loss, Meters, Speed, Degrees
-from trace_calc.models.input_data import InputData
-from trace_calc.models.path import PathData, ProfileData
-from trace_calc.services.base import BaseAnalyzer
-from trace_calc.services.plotter import ProfilePlotter
-from trace_calc.services.profile_data_calculator import DefaultProfileDataCalculator
-from trace_calc.services.speed_calculators import (
+from trace_calc.domain.models.units import (
+    Angle,
+    Kilometers,
+    Loss,
+    Meters,
+    Speed,
+    Degrees,
+)
+from trace_calc.domain.models.coordinates import InputData
+from trace_calc.domain.models.path import PathData, ProfileData
+from trace_calc.domain.models.analysis import AnalysisResult, PropagationLoss
+from trace_calc.domain.constants import OUTPUT_DATA_DIR
+from trace_calc.application.services.base import BaseAnalyzer
+from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
+from trace_calc.application.services.profile_data_calculator import (
+    DefaultProfileDataCalculator,
+)
+from trace_calc.domain.speed_calculators import (
     GrozaSpeedCalculator,
     SosnikSpeedCalculator,
 )
-from trace_calc.services.validators import validate_distance, validate_wavelength
+from trace_calc.domain.validators import validate_distance, validate_wavelength
+
+logger = logging.getLogger(__name__)
 
 
 class PlotterMixin:
     distances: NDArray[np.float64]
     profile_data: ProfileData
     input_data: InputData
+    path_data: PathData
 
     def draw_plot(self) -> None:
-        plotter = ProfilePlotter(self.profile_data)
-        plotter.plot(self.distances, self.input_data.path_name)
-
-
-class PrinterMixin:
-    def print_results(self, **values: Any) -> None:
-        speed_prefix = values.get("speed_prefix")
-        extra_dist = values.get("extra_dist")
-        speed = values.get("speed")
-
-        print(
-            f"Extra distance = {extra_dist:.1f} km"
-        ) if extra_dist is not None else ...
-        print(
-            f"Estimated median speed = {speed:.1f} {speed_prefix}bits/s"
-        ) if speed is not None else ...
-
-        for key, value in values.items():
-            if key not in ("extra_dist", "speed"):
-                print(f"{key}: {value}")
+        show_plot = "PYTEST_CURRENT_TEST" not in os.environ
+        visualizer = ProfileVisualizer()
+        visualizer.plot_profile(
+            self.path_data,
+            self.profile_data,
+            show=show_plot,
+            save_path=f"{OUTPUT_DATA_DIR}/{self.input_data.path_name}.png",
+        )
 
 
 class GrozaAnalyzer(
     BaseAnalyzer,
     GrozaSpeedCalculator,
-    PrinterMixin,
     PlotterMixin,
 ):
     def __init__(self, profile: PathData, input_data: InputData):
@@ -57,6 +60,7 @@ class GrozaAnalyzer(
         profile_data_calculator = DefaultProfileDataCalculator(profile, input_data)
         self.profile_data = profile_data_calculator.profile_data
         self.hca_data = profile_data_calculator.hca_data
+        self.path_data = profile
 
         hca_calc = profile_data_calculator.hca_calculator
         self.distances = hca_calc.distances
@@ -142,8 +146,8 @@ class GrozaAnalyzer(
 
         Ltot, dL, speed = self.calculate_speed(L0, Lmed, Lr, Lk, 2)
 
-        print(f"Total losses = {Ltot:.1f} dB")
-        print(f"Delta to reference trace = {dL:.1f} dB")
+        logger.debug(f"Total losses = {Ltot:.1f} dB")
+        logger.debug(f"Delta to reference trace = {dL:.1f} dB")
         speed_prefix = "M"
         if speed < 1:
             speed = Speed(speed * 1024)
@@ -162,7 +166,6 @@ class GrozaAnalyzer(
             "speed": speed,
             "speed_prefix": speed_prefix,
         }
-        self.print_results(**data)
         self.draw_plot()
 
         return data
@@ -171,7 +174,6 @@ class GrozaAnalyzer(
 class SosnikAnalyzer(
     BaseAnalyzer,
     SosnikSpeedCalculator,
-    PrinterMixin,
     PlotterMixin,
 ):
     def __init__(self, profile: PathData, input_data: InputData):
@@ -180,6 +182,7 @@ class SosnikAnalyzer(
         profile_data_calculator = DefaultProfileDataCalculator(profile, input_data)
         self.profile_data = profile_data_calculator.profile_data
         self.hca_data = profile_data_calculator.hca_data
+        self.path_data = profile
 
         hca_calc = profile_data_calculator.hca_calculator
         self.distances = hca_calc.distances
@@ -198,7 +201,7 @@ class SosnikAnalyzer(
             / (0.4 * trace_dist + b_sum * 60)
             * (1 + (b_sum * 60 / (0.2 * trace_dist)))
         )
-        print(f"Argument {arg}")
+        logger.debug(f"Argument {arg}")
         if arg > 0:
             Lr = Loss(-40 * math.log10(arg))
         else:
@@ -214,7 +217,82 @@ class SosnikAnalyzer(
             "speed": speed,
             "speed_prefix": "k",
         }
-        self.print_results(**data)
         self.draw_plot()
 
         return data
+
+
+class BaseAnalysisService(Protocol):
+    """
+    Defines the interface for analysis services.
+    """
+
+    async def analyze(
+        self, path: PathData, input_data: InputData, **kwargs: Any
+    ) -> AnalysisResult: ...
+
+
+class GrozaAnalysisService(BaseAnalysisService):
+    """
+    Analysis service specifically for the Groza model.
+    """
+
+    async def analyze(
+        self, path: PathData, input_data: InputData, **kwargs: Any
+    ) -> AnalysisResult:
+        analyzer = GrozaAnalyzer(path, input_data)
+        result_data = analyzer.analyze(**kwargs)
+
+        # Speed of light in m/s
+        c = 299792458
+        frequency_hz = input_data.frequency_mhz * 1e6
+        wavelength_m = c / frequency_hz
+
+        propagation_loss = PropagationLoss(
+            free_space_loss=result_data["L0"],
+            atmospheric_loss=0,  # Not calculated in GrozaAnalyzer
+            diffraction_loss=result_data["Lr"],
+            total_loss=result_data["L0"] + result_data["Lr"],
+        )
+
+        result_data["method"] = "groza"
+
+        return AnalysisResult(
+            basic_transmission_loss=result_data["Ltot"],
+            total_path_loss=result_data["Ltot"],
+            link_speed=result_data["speed"],
+            wavelength=wavelength_m,
+            propagation_loss=propagation_loss,
+            metadata=result_data,
+        )
+
+
+class SosnikAnalysisService(BaseAnalysisService):
+    """
+    Analysis service specifically for the Sosnik model.
+    """
+
+    async def analyze(
+        self, path: PathData, input_data: InputData, **kwargs: Any
+    ) -> AnalysisResult:
+        analyzer = SosnikAnalyzer(path, input_data)
+        result_data = analyzer.analyze(**kwargs)
+
+        # Speed of light in m/s
+        c = 299792458
+        frequency_hz = input_data.frequency_mhz * 1e6
+        wavelength_m = c / frequency_hz
+
+        # Sosnik analyzer does not provide a full loss breakdown
+        propagation_loss = None
+
+        result_data["method"] = "sosnik"
+
+        return AnalysisResult(
+            basic_transmission_loss=result_data["Lr"],  # Sosnik uses Lr as main loss
+            total_path_loss=result_data["Lr"],
+            link_speed=result_data["speed"],
+            wavelength=wavelength_m,
+            propagation_loss=propagation_loss,
+            metadata=result_data,
+        )

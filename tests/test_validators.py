@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from trace_calc.models.input_data import Coordinates
-from trace_calc.services.coordinates_service import CoordinatesService
-from trace_calc.services.validators import ValidationError
+from trace_calc.domain.models.coordinates import Coordinates
+from trace_calc.application.services.coordinates import CoordinatesService
+from trace_calc.domain.validators import ValidationError
 
 
 def test_coordinates_service_with_numpy_array_raises_error():

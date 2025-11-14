@@ -1,14 +1,17 @@
+import logging
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.units import Kilometers
-from trace_calc.models.input_data import InputData
-from trace_calc.models.path import PathData
-from trace_calc.services.base import BaseElevationsApiClient
-from trace_calc.services.coordinates_service import CoordinatesService
-from trace_calc.services.exceptions import CoordinatesRequiredException
+from trace_calc.domain.models.units import Kilometers
+from trace_calc.domain.models.coordinates import InputData
+from trace_calc.domain.models.path import PathData
+from .base import BaseElevationsApiClient
+from .coordinates import CoordinatesService
+from trace_calc.domain.exceptions import CoordinatesRequiredException
+
+logger = logging.getLogger(__name__)
 
 
 class PathProfileService:
@@ -65,7 +68,7 @@ class PathProfileService:
         """
         self.coord_vect = self.linspace_coord()
         points_num = self.coord_vect.shape[0]
-        print(f"Coordinates: {self.coord_a} {self.coord_b}")
+        logger.info(f"Coordinates: {self.coord_a} {self.coord_b}")
 
         coordinates_service = CoordinatesService(self.coord_a, self.coord_b)
         full_distance: Kilometers = coordinates_service.get_distance()

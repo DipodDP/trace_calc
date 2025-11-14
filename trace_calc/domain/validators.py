@@ -3,8 +3,8 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.units import Elevation, Kilometers, Meters
-from trace_calc.models.input_data import Coordinates
+from trace_calc.domain.models.units import Elevation, Kilometers, Meters
+from trace_calc.domain.models.coordinates import Coordinates
 
 
 class ValidationError(ValueError):

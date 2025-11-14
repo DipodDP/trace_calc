@@ -1,8 +1,8 @@
 import math
 import numpy as np
-from trace_calc.domain.units import Angle, Kilometers, Meters, Degrees
-from trace_calc.models.input_data import Coordinates
-from trace_calc.services.validators import validate_coordinates, validate_arccos_domain
+from trace_calc.domain.models.units import Angle, Kilometers, Meters, Degrees
+from trace_calc.domain.models.coordinates import Coordinates
+from trace_calc.domain.validators import validate_coordinates, validate_arccos_domain
 
 
 class CoordinatesService:
@@ -53,7 +53,8 @@ class CoordinatesService:
         """
         Calculates the distance between two coordinates in kilometers.
         """
-        return Kilometers(self.earth_radius * self.get_angle())
+        # Convert from meters to kilometers
+        return Kilometers(self.earth_radius * self.get_angle() / 1000)
 
     def get_angle(
         self,

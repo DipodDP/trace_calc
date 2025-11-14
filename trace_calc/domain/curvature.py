@@ -2,10 +2,8 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.units import Kilometers
-
-CURVATURE_SCALE = 12.742
-GEOMETRIC_CURVATURE_SCALE = CURVATURE_SCALE * 1000
+from trace_calc.domain.models.units import Kilometers
+from trace_calc.domain.constants import CURVATURE_SCALE, GEOMETRIC_CURVATURE_SCALE
 
 
 def apply_geometric_curvature(distances_km: NDArray[np.float64]) -> NDArray[np.float64]:
