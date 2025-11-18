@@ -1,8 +1,10 @@
 """Profile visualization service (separated from analysis logic)"""
+import os
 from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 
+from trace_calc.domain.curvature import calculate_earth_drop
 from trace_calc.domain.models.path import PathData, ProfileData
 from trace_calc.domain.models.analysis import AnalysisResult
 
@@ -56,13 +58,16 @@ class ProfileVisualizer:
             raise ValueError("`distances` must be a 1D array with at least two points.")
 
         # Create two-panel figure matching original dimensions
-        fig, axes = plt.subplots(2, 1, figsize=(19.20, 5.4))
+        fig, axes = plt.subplots(2, 1, figsize=(19.20, 10.8))
 
         # ===== Panel 1: Plain Profile =====
-        elevations, zero = profile.plain.elevations, profile.plain.baseline
-        axes[0].plot(distances, elevations, "g", label="Elevation")
+        elevations, zero = profile.plain.elevations / 1000, profile.plain.baseline / 1000
+        axes[0].plot(distances, elevations, "k-", linewidth=1.0, label="Terrain")
         axes[0].fill_between(distances, elevations, zero, facecolor="g", alpha=0.2)
         axes[0].grid(True)
+        axes[0].set_title("Plain Elevation Profile", fontsize=12, fontweight='bold')
+        axes[0].set_xlabel("Distance (km)", fontsize=10)
+        axes[0].set_ylabel("Elevation (km)", fontsize=10)
 
         elevations_range = elevations.max() - elevations.min()
         axes[0].set_xlim(distances[0], distances[-1])
@@ -72,61 +77,187 @@ class ProfileVisualizer:
         )
 
         # ===== Panel 2: Curved Profile with Sight Lines =====
-        elevations_curved, zero_curved = profile.curved.elevations, profile.curved.baseline
+        elevations_curved, zero_curved = profile.curved.elevations / 1000, profile.curved.baseline / 1000
 
-        # Shift baseline to start at 0 for clean plotting
-        shift = zero_curved[0]
-        zero_curved_for_plot = zero_curved - shift
-        elevations_curved_for_plot = elevations_curved - shift
-
-        sight_1, sight_2, cross = profile.lines_of_sight
-        sight_1_for_plot = np.polyval(sight_1, distances.astype(float)) - shift
-        sight_2_for_plot = np.polyval(sight_2, distances.astype(float)) - shift
-        cross_for_plot = (cross[0], cross[1] - shift)
+        sight_lines = profile.lines_of_sight
+        intersections = profile.intersections
 
         # Plot curved elevation with fill
         axes[1].plot(
-            distances, elevations_curved_for_plot, "g", label="Curved Elevation"
+            distances, elevations_curved, "k-", linewidth=1.0, label="Terrain (curved)"
         )
         axes[1].fill_between(
             distances,
-            elevations_curved_for_plot,
-            zero_curved_for_plot,
+            elevations_curved,
+            zero_curved,
             facecolor="g",
             alpha=0.2,
         )
 
-        # Plot sight lines
+        # Plot lower sight lines (using colors that work well in grayscale)
+        lower_line_1 = np.polyval(sight_lines.lower_a, distances.astype(float)) / 1000
+        lower_line_2 = np.polyval(sight_lines.lower_b, distances.astype(float)) / 1000
+        axes[1].plot(distances, lower_line_1, color='C1', linestyle='-', lw=2.0, label="Lower sight line A")
+        axes[1].plot(distances, lower_line_2, color='C0', linestyle='-', lw=2.0, label="Lower sight line B")
+
+        # Plot upper sight lines (same colors as lower, but dashed)
+        upper_line_1 = np.polyval(sight_lines.upper_a, distances.astype(float)) / 1000
+        upper_line_2 = np.polyval(sight_lines.upper_b, distances.astype(float)) / 1000
         axes[1].plot(
             distances,
-            sight_1_for_plot,
-            lw=1.4,
-            linestyle="--",
-            label="Sight Line A",
+            upper_line_1,
+            color='C1',
+            linestyle='--',
+            lw=2.0,
+            alpha=0.8,
+            label="Upper sight line A",
         )
         axes[1].plot(
             distances,
-            sight_2_for_plot,
-            lw=1.4,
-            linestyle="--",
-            label="Sight Line B",
+            upper_line_2,
+            color='C0',
+            linestyle='--',
+            lw=2.0,
+            alpha=0.8,
+            label="Upper sight line B",
         )
-        axes[1].scatter(*cross_for_plot, zorder=5, label="Intersection")
+
+        # Plot bisectors
+        axes[1].plot(
+            distances,
+            profile.lines_of_sight.bisector_a / 1000,
+            color='purple',
+            linestyle=':',
+            lw=1.5,
+            alpha=0.9,
+            label="Bisector A",
+        )
+        axes[1].plot(
+            distances,
+            profile.lines_of_sight.bisector_b / 1000,
+            color='brown',
+            linestyle=':',
+            lw=1.5,
+            alpha=0.9,
+            label="Bisector B",
+        )
+
+        # Plot intersection points (using colors with good grayscale contrast)
+        # Note: We add the earth drop back to the elevations for plotting purposes only.
+        # This projects the physically accurate (curved sea level) coordinates back
+        # onto the flat tangent plane that the sight lines are drawn on.
+        lower_int = intersections.lower_intersection
+        upper_int = intersections.upper_intersection
+        cross_ab_int = intersections.cross_ab
+        cross_ba_int = intersections.cross_ba
+
+        lower_plot_elev = (lower_int.elevation_sea_level + calculate_earth_drop(np.array([lower_int.distance_km]))[0]) / 1000
+        upper_plot_elev = (upper_int.elevation_sea_level + calculate_earth_drop(np.array([upper_int.distance_km]))[0]) / 1000
+        cross_ab_plot_elev = (cross_ab_int.elevation_sea_level + calculate_earth_drop(np.array([cross_ab_int.distance_km]))[0]) / 1000
+        cross_ba_plot_elev = (cross_ba_int.elevation_sea_level + calculate_earth_drop(np.array([cross_ba_int.distance_km]))[0]) / 1000
+
+        axes[1].scatter(
+            lower_int.distance_km,
+            lower_plot_elev,
+            c="darkgreen",
+            s=120,
+            marker="o",
+            label="Lower intersection",
+            edgecolors='black',
+            linewidths=1.5,
+            zorder=5,
+        )
+        axes[1].scatter(
+            upper_int.distance_km,
+            upper_plot_elev,
+            c="darkred",
+            s=120,
+            marker="o",
+            label="Upper intersection",
+            edgecolors='black',
+            linewidths=1.5,
+            zorder=5,
+        )
+        axes[1].scatter(
+            cross_ab_int.distance_km,
+            cross_ab_plot_elev,
+            c="goldenrod",
+            s=100,
+            marker="^",
+            label="Cross AB (Upper A × Lower B)",
+            edgecolors='black',
+            linewidths=1.5,
+            zorder=5,
+        )
+        axes[1].scatter(
+            cross_ba_int.distance_km,
+            cross_ba_plot_elev,
+            c="indigo",
+            s=100,
+            marker="v",
+            label="Cross BA (Upper B × Lower A)",
+            edgecolors='black',
+            linewidths=1.5,
+            zorder=5,
+        )
+
         axes[1].grid(True)
-        axes[1].legend()
+        axes[1].set_title("Curved Profile with Common Scatter Volume Analysis", fontsize=12, fontweight='bold')
+        axes[1].set_xlabel("Distance (km)", fontsize=10)
+        axes[1].set_ylabel("Elevation (km)", fontsize=10)
+        axes[1].legend(loc="upper right", fontsize=8, ncol=2)
+
+        # Add volume metrics text box
+        height_between_intersections = (
+            profile.intersections.upper_intersection.elevation_sea_level
+            - profile.intersections.lower_intersection.elevation_sea_level
+        )
+        metrics_text = (
+            f"Common scatter volume: {profile.volume.cone_intersection_volume_m3 / 1e9:.2f} km³\n"
+            f"Distance A→Cross AB: {profile.volume.distance_a_to_cross_ab:.2f} km\n"
+            f"Distance B→Cross BA: {profile.volume.distance_b_to_cross_ba:.2f} km\n"
+            f"Distance between crosses: {profile.volume.distance_between_crosses:.2f} km\n"
+            f"Top above terrain: {profile.intersections.upper_intersection.elevation_terrain / 1000:.2f} km ("
+            f"ASL: {profile.intersections.upper_intersection.elevation_sea_level / 1000:.2f} km)\n"
+            f"Bottom above terrain: {profile.intersections.lower_intersection.elevation_terrain / 1000:.2f} km ("
+            f"ASL: {profile.intersections.lower_intersection.elevation_sea_level / 1000:.2f} km)\n"
+            f"Height: {height_between_intersections / 1000:.2f} km"
+        )
+        axes[1].text(
+            0.02, 0.98, metrics_text,
+            transform=axes[1].transAxes,
+            fontsize=8, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        )
 
         # Set Y-axis limits for curved panel
-        y_max = cross_for_plot[1] * 1.1
-        lower_limit = elevations_curved_for_plot.min() - 20
-        if lower_limit > -10:
-            lower_limit = -10
+        # Calculate site positions from sight lines (where they're anchored)
+        site_a_elevation = np.polyval(sight_lines.lower_a, distances[0]) / 1000
+        site_b_elevation = np.polyval(sight_lines.lower_b, distances[-1]) / 1000
+
+        all_y_values = [
+            lower_plot_elev,
+            upper_plot_elev,
+            cross_ab_plot_elev,
+            cross_ba_plot_elev,
+            elevations_curved.max(),
+            site_a_elevation,  # Site A antenna position
+            site_b_elevation,  # Site B antenna position
+            0,  # Sea level
+        ]
+        y_min = min(all_y_values) - 0.1  # Add 100m margin below
+        y_max = max(all_y_values) + 0.1  # Add 100m margin above
+        axes[1].set_ylim(y_min, y_max)
 
         axes[1].set_xlim(distances[0], distances[-1])
-        axes[1].set_ylim(bottom=lower_limit, top=y_max + 20)
 
         # Save with original styling
         if save_path:
+            output_dir = os.path.dirname(save_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
             fig.savefig(save_path, dpi=300, facecolor="mintcream")
+            plt.tight_layout()
 
         if show:
             plt.show()

@@ -1,7 +1,7 @@
 """Tests for AsyncElevationsApiClient API request behavior"""
+
 import pytest
 import numpy as np
-from unittest.mock import AsyncMock, patch
 
 from trace_calc.domain.models.coordinates import Coordinates, InputData
 from trace_calc.infrastructure.api.clients import AsyncElevationsApiClient
@@ -22,8 +22,7 @@ def sample_input_data():
 def api_client():
     """Create API client for testing"""
     return AsyncElevationsApiClient(
-        api_url="https://api.example.com/elevations",
-        api_key="test_key"
+        api_url="https://api.example.com/elevations", api_key="test_key"
     )
 
 
@@ -37,14 +36,14 @@ class ApiRequestTracker:
 
     def create_tracked_method(self, original_method=None):
         """Create a tracked version of the API request method"""
+
         async def tracked_method(coord_vect_block):
             self.call_count += 1
             block_size = len(coord_vect_block)
             self.call_sizes.append(block_size)
-            self.call_coordinates.append({
-                'first': coord_vect_block[0],
-                'last': coord_vect_block[-1]
-            })
+            self.call_coordinates.append(
+                {"first": coord_vect_block[0], "last": coord_vect_block[-1]}
+            )
             # Return mock elevation data
             return [100.0] * block_size
 
@@ -114,9 +113,7 @@ async def test_api_request_block_sizes(sample_input_data, api_client):
     # Check block sizes
     for i, size in enumerate(tracker.call_sizes[:-1]):
         # All blocks except possibly the last should be full size
-        assert size == block_size, (
-            f"Block {i} has size {size}, expected {block_size}"
-        )
+        assert size == block_size, f"Block {i} has size {size}, expected {block_size}"
 
     # Last block can be partial
     last_block_size = tracker.call_sizes[-1]
@@ -127,13 +124,16 @@ async def test_api_request_block_sizes(sample_input_data, api_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("block_size,resolution", [
-    (128, 0.5),
-    (256, 0.5),
-    (512, 0.5),
-    (256, 1.0),
-    (256, 0.25),
-])
+@pytest.mark.parametrize(
+    "block_size,resolution",
+    [
+        (128, 0.5),
+        (256, 0.5),
+        (512, 0.5),
+        (256, 1.0),
+        (256, 0.25),
+    ],
+)
 async def test_api_requests_with_different_parameters(
     sample_input_data, api_client, block_size, resolution
 ):
@@ -179,23 +179,21 @@ async def test_api_request_coordinate_continuity(sample_input_data, api_client):
     await api_client.fetch_elevations(coord_vect, block_size=256)
 
     # Verify first block starts with first coordinate
-    assert np.allclose(
-        tracker.call_coordinates[0]['first'],
-        coord_vect[0]
-    ), "First block doesn't start with first coordinate"
+    assert np.allclose(tracker.call_coordinates[0]["first"], coord_vect[0]), (
+        "First block doesn't start with first coordinate"
+    )
 
     # Verify last block ends with last coordinate
-    assert np.allclose(
-        tracker.call_coordinates[-1]['last'],
-        coord_vect[-1]
-    ), "Last block doesn't end with last coordinate"
+    assert np.allclose(tracker.call_coordinates[-1]["last"], coord_vect[-1]), (
+        "Last block doesn't end with last coordinate"
+    )
 
     # Verify blocks are continuous (last coord of block N == first coord of block N+1 - 1)
     if len(tracker.call_coordinates) > 1:
         cumulative_size = 0
         for i, size in enumerate(tracker.call_sizes[:-1]):
             expected_last = coord_vect[cumulative_size + size - 1]
-            actual_last = tracker.call_coordinates[i]['last']
+            actual_last = tracker.call_coordinates[i]["last"]
             assert np.allclose(actual_last, expected_last), (
                 f"Block {i} last coordinate doesn't match expected position"
             )
@@ -234,7 +232,9 @@ async def test_single_block_request(api_client):
         f"Expected {large_block_size} coordinates (one block), got {coord_vect.shape[0]}"
     )
 
-    elevations = await api_client.fetch_elevations(coord_vect, block_size=large_block_size)
+    elevations = await api_client.fetch_elevations(
+        coord_vect, block_size=large_block_size
+    )
 
     # Should make exactly 1 API request
     assert tracker.call_count == 1, f"Expected 1 request, got {tracker.call_count}"

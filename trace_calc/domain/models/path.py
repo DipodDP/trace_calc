@@ -7,6 +7,44 @@ from numpy.typing import NDArray
 from .units import Angle, Kilometers
 
 
+class IntersectionPoint(NamedTuple):
+    """Represents a point where two sight lines intersect."""
+    distance_km: float
+    elevation_sea_level: float
+    elevation_terrain: float
+
+
+class SightLinesData(NamedTuple):
+    """Container for all four sight line equations."""
+    lower_a: NDArray[np.float64]
+    lower_b: NDArray[np.float64]
+    upper_a: NDArray[np.float64]
+    upper_b: NDArray[np.float64]
+    bisector_a: NDArray[np.float64]
+    bisector_b: NDArray[np.float64]
+
+
+class IntersectionsData(NamedTuple):
+    """All intersection points between sight lines."""
+    lower_intersection: IntersectionPoint
+    upper_intersection: IntersectionPoint
+    cross_ab: IntersectionPoint
+    cross_ba: IntersectionPoint
+
+
+class VolumeData(NamedTuple):
+    """Volumetric and distance metrics for analysis region."""
+    cone_intersection_volume_m3: float
+    distance_a_to_cross_ab: float
+    distance_b_to_cross_ba: float
+    distance_between_crosses: float
+    distance_a_to_lower_intersection: float
+    distance_b_to_lower_intersection: float
+    distance_a_to_upper_intersection: float
+    distance_b_to_upper_intersection: float
+    distance_between_lower_upper_intersections: float
+
+
 @dataclass(slots=True)
 class GeoData:
     """
@@ -81,9 +119,13 @@ class ProfileData:
 
     :param plain: Plain profile ProfileViewData
     :param curved: Curved profile ProfileViewData
-    :param elevations: A tuple of line A, line B coefficients and intersection point
+    :param lines_of_sight: SightLinesData object
+    :param intersections: IntersectionsData object
+    :param volume: VolumeData object
     """
 
     plain: ProfileViewData
     curved: ProfileViewData
-    lines_of_sight: tuple[NDArray[np.float64], NDArray[np.float64], tuple[float, float]]
+    lines_of_sight: SightLinesData
+    intersections: IntersectionsData
+    volume: VolumeData

@@ -256,6 +256,9 @@ class GrozaAnalysisService(BaseAnalysisService):
         )
 
         result_data["method"] = "groza"
+        result_data["profile_data"] = analyzer.profile_data
+        result_data["frequency_mhz"] = input_data.frequency_mhz
+        result_data["distance_km"] = float(analyzer.distances[-1])
 
         return AnalysisResult(
             basic_transmission_loss=result_data["Ltot"],
@@ -287,6 +290,9 @@ class SosnikAnalysisService(BaseAnalysisService):
         propagation_loss = None
 
         result_data["method"] = "sosnik"
+        result_data["profile_data"] = analyzer.profile_data
+        result_data["frequency_mhz"] = input_data.frequency_mhz
+        result_data["distance_km"] = float(analyzer.distances[-1])
 
         return AnalysisResult(
             basic_transmission_loss=result_data["Lr"],  # Sosnik uses Lr as main loss

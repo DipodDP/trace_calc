@@ -3,11 +3,8 @@ import pytest
 
 from tests.mocks import MockElevationsApiClient
 from trace_calc.domain.models.coordinates import Coordinates, InputData
-from trace_calc.application.services.base import BaseElevationsApiClient
 from trace_calc.domain.exceptions import CoordinatesRequiredException
 from trace_calc.application.services.profile import PathProfileService
-
-
 
 
 # Parametrized test cases for linspace_coord edge cases.
@@ -42,9 +39,9 @@ def test_linspace_coord_edge_cases(site_a, site_b, expected_behavior):
         resolution=1,
     )
     coords = service.linspace_coord()
-    print('\n', input_data)
-    print('\nCoordinates: ', service.coord_a, service.coord_b)
-    print('Coordinate vector:\n', coords)
+    print("\n", input_data)
+    print("\nCoordinates: ", service.coord_a, service.coord_b)
+    print("Coordinate vector:\n", coords)
     assert isinstance(coords, np.ndarray)
     assert coords.ndim == 2 and coords.shape[1] == 2
     # Expect the shortest path is choosen for latitude.
@@ -60,7 +57,9 @@ def test_linspace_coord_edge_cases(site_a, site_b, expected_behavior):
         # For identical coordinates, all rows should be the same.
         expected_point = np.array([site_a[0], site_a[1]])
         # Ensure every coordinate equals the expected point.
-        assert np.all(np.isclose(coords, expected_point)), "Not all points are identical for identical inputs."
+        assert np.all(np.isclose(coords, expected_point)), (
+            "Not all points are identical for identical inputs."
+        )
 
     elif expected_behavior == "normal":
         # Expect the first coordinate to match site_a and the last to match site_b.

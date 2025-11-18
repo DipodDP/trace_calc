@@ -5,7 +5,7 @@ Test script to plot real terrain data from test.path file.
 Reads binary path data and creates curved profile with:
 - Sites at endpoints
 - Lower sight lines just above terrain
-- Extended visibility features
+- Common Scatter Volume features
 """
 
 import struct
@@ -73,17 +73,19 @@ def apply_earth_curvature(distances_km: np.ndarray) -> np.ndarray:
         distances_km: Distance array in kilometers
 
     Returns:
-        Curvature correction array in meters (negative values)
+        Curvature correction array in meters (positive values, representing upward bulge)
     """
     # Earth radius in km
     R = 6371.0
 
-    # Calculate reference point (middle of path)
-    ref_distance = distances_km[len(distances_km) // 2]
+    # Calculate curvature relative to straight line between endpoints
+    # Formula: h = x * (d - x) / (2 * R)
+    # where x is distance from start, d is total distance
+    d = distances_km[-1] - distances_km[0]  # Total path length
+    x = distances_km - distances_km[0]  # Distance from start point
 
-    # Curvature correction: h = d^2 / (2*R)
-    # Relative to reference point
-    curvature = -(distances_km - ref_distance) ** 2 / (2 * R * 1000)
+    # Curvature correction (positive = terrain bulges above straight line)
+    curvature = x * (d - x) / (2 * R) * 1000  # Convert to meters
 
     return curvature
 
@@ -286,11 +288,10 @@ def plot_real_data_profile(
     axes[0].legend(loc='best', fontsize=9)
 
     # ========================================================================
-    # PANEL 2: CURVED PROFILE WITH EXTENDED VISIBILITY
+    # PANEL 2: CURVED PROFILE WITH COMMON SCATTER VOLUME ANALYSIS
     # ========================================================================
 
     # Use actual elevations (no shift) to show true sea level reference
-    shift = 0
     elevations_for_plot = elevations_curved
 
     # Plot terrain
@@ -386,7 +387,7 @@ def plot_real_data_profile(
     axes[1].grid(True, alpha=0.3)
     axes[1].set_xlabel('Distance (km)', fontsize=11, fontweight='bold')
     axes[1].set_ylabel('Elevation (m)', fontsize=11, fontweight='bold')
-    axes[1].set_title('Curved Profile with Extended Visibility Analysis (Real Data)',
+    axes[1].set_title('Curved Profile with Common Scatter Volume Analysis (Real Data)',
                       fontsize=13, fontweight='bold')
     axes[1].legend(loc='best', fontsize=8, ncol=2)
 

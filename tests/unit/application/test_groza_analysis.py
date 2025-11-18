@@ -1,10 +1,11 @@
 """Unit tests for Groza propagation analysis (no I/O)"""
+
 import pytest
 import numpy as np
 from trace_calc.application.services.analysis import GrozaAnalysisService
 from trace_calc.domain.models.path import PathData
 from trace_calc.domain.models.coordinates import InputData, Coordinates
-from trace_calc.domain.models.units import Meters, Kilometers
+from trace_calc.domain.models.units import Meters
 from trace_calc.domain.models.analysis import AnalysisResult
 
 
@@ -21,6 +22,8 @@ def sample_path_data():
 @pytest.fixture
 def sample_input_data():
     """Create sample input data"""
+    from trace_calc.domain.models.units import Angle
+
     return InputData(
         path_name="test_path",
         frequency_mhz=1000.0,
@@ -28,6 +31,7 @@ def sample_input_data():
         site_b_coordinates=Coordinates(50.1, 14.1),
         antenna_a_height=Meters(300.0),
         antenna_b_height=Meters(350.0),
+        elevation_angle_offset=Angle(0.0),  # Use zero offset for basic tests
     )
 
 
@@ -38,7 +42,7 @@ def test_groza_analysis_returns_result(sample_path_data, sample_input_data):
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
-        antenna_b_height=10.0
+        antenna_b_height=10.0,
     )
 
     # Verify it returns correct type
@@ -59,7 +63,7 @@ def test_groza_analysis_no_side_effects(sample_path_data, sample_input_data, cap
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
-        antenna_b_height=10.0
+        antenna_b_height=10.0,
     )
 
     # Capture stdout/stderr
@@ -79,13 +83,13 @@ def test_groza_analysis_deterministic(sample_path_data, sample_input_data):
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
-        antenna_b_height=10.0
+        antenna_b_height=10.0,
     )
     result2 = service2.analyze(
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
-        antenna_b_height=10.0
+        antenna_b_height=10.0,
     )
 
     # Results should be identical
@@ -102,7 +106,7 @@ def test_groza_wavelength_calculation(sample_path_data, sample_input_data):
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
-        antenna_b_height=10.0
+        antenna_b_height=10.0,
     )
 
     # Frequency = 1000 MHz = 1e9 Hz

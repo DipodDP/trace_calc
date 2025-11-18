@@ -5,8 +5,115 @@ import json
 
 from trace_calc.domain.models.analysis import AnalysisResult
 from trace_calc.domain.models.coordinates import InputData
-from trace_calc.domain.models.path import GeoData
+from trace_calc.domain.models.path import GeoData, ProfileData
 from trace_calc.application.services.coordinates import CoordinatesService
+
+
+def format_common_volume_results(profile: ProfileData) -> str:
+    """
+    Format Common Scatter Volume analysis results for console output.
+
+    Args:
+        profile: Complete profile data with intersections and volume
+
+    Returns:
+        Formatted string for console display
+    """
+    sight_lines = profile.lines_of_sight
+    intersections = profile.intersections
+    volume = profile.volume
+
+    output = []
+    output.append("\n=== Common Scatter Volume Analysis ===")
+
+    # Lower sight lines
+    output.append("\nLower Sight Lines:")
+    output.append(
+        f"  Site A -> Obstacle: slope={sight_lines.lower_a[0]:.4f}, "
+        f"intercept={sight_lines.lower_a[1]/1000:.4f}km"
+    )
+    output.append(
+        f"  Site B -> Obstacle: slope={-sight_lines.lower_b[0]:.4f}, "
+        f"intercept={sight_lines.lower_b[1]/1000:.4f}km"
+    )
+
+    # Upper sight lines
+    output.append("\nUpper Sight Lines:")
+    output.append(
+        f"  Site A (upper): slope={sight_lines.upper_a[0]:.4f}, "
+        f"intercept={sight_lines.upper_a[1]/1000:.4f}km"
+    )
+    output.append(
+        f"  Site B (upper): slope={-sight_lines.upper_b[0]:.4f}, "
+        f"intercept={sight_lines.upper_b[1]/1000:.4f}km"
+    )
+
+    # Bisectors
+    output.append("\nBisectors:")
+    output.append(
+        f"  Bisector A starts at {profile.lines_of_sight.bisector_a[0]/1000:.4f}km and ends at {profile.lines_of_sight.bisector_a[-1]/1000:.4f}km"
+    )
+    output.append(
+        f"  Bisector B starts at {profile.lines_of_sight.bisector_b[0]/1000:.4f}km and ends at {profile.lines_of_sight.bisector_b[-1]/1000:.4f}km"
+    )
+
+    # Cross intersections
+    output.append("\nCross Intersections:")
+    output.append(
+        f"  Upper A x Lower B: {intersections.cross_ab.distance_km:.2f} km, "
+        f"{intersections.cross_ab.elevation_sea_level/1000:.4f}km ASL, "
+        f"{intersections.cross_ab.elevation_terrain/1000:.4f}km above terrain"
+    )
+    output.append(
+        f"  Upper B x Lower A: {intersections.cross_ba.distance_km:.2f} km, "
+        f"{intersections.cross_ba.elevation_sea_level/1000:.4f}km ASL, "
+        f"{intersections.cross_ba.elevation_terrain/1000:.4f}km above terrain"
+    )
+
+    # Volume metrics
+    output.append("\nVolume Metrics:")
+    output.append(
+        f"  Common scatter volume: {volume.cone_intersection_volume_m3 / 1e9:.2f} km³"
+    )
+    output.append(
+        f"  Distance from A to Upper A x Lower B: {volume.distance_a_to_cross_ab:.2f} km"
+    )
+    output.append(
+        f"  Distance from B to Upper B x Lower A: {volume.distance_b_to_cross_ba:.2f} km"
+    )
+    output.append(
+        f"  Distance between cross intersections: {volume.distance_between_crosses:.2f} km"
+    )
+    output.append(
+        f"  Common volume top (upper intersection): {intersections.upper_intersection.distance_km:.2f} km, "
+        f"{intersections.upper_intersection.elevation_terrain/1000:.2f} km above terrain, "
+        f"{intersections.upper_intersection.elevation_sea_level/1000:.2f} km ASL"
+    )
+    output.append(
+        f"  Common volume bottom (lower intersection): {intersections.lower_intersection.distance_km:.2f} km, "
+        f"{intersections.lower_intersection.elevation_terrain/1000:.2f} km above terrain, "
+        f"{intersections.lower_intersection.elevation_sea_level/1000:.2f} km ASL"
+    )
+
+    # Distance metrics to lower/upper intersections
+    output.append("\nDistance Metrics:")
+    output.append(
+        f"  Distance from A to lower intersection: {volume.distance_a_to_lower_intersection:.2f} km"
+    )
+    output.append(
+        f"  Distance from B to lower intersection: {volume.distance_b_to_lower_intersection:.2f} km"
+    )
+    output.append(
+        f"  Distance from A to upper intersection: {volume.distance_a_to_upper_intersection:.2f} km"
+    )
+    output.append(
+        f"  Distance from B to upper intersection: {volume.distance_b_to_upper_intersection:.2f} km"
+    )
+    output.append(
+        f"  Distance between lower and upper intersections: {volume.distance_between_lower_upper_intersections:.2f} km"
+    )
+
+    return "\n".join(output)
 
 
 class OutputFormatter(Protocol):
@@ -117,6 +224,9 @@ class ConsoleOutputFormatter:
             )
             print(f"  Link Margin:             {margin:.1f} dB ({status})")
 
+        if "profile_data" in result.metadata:
+            print(format_common_volume_results(result.metadata["profile_data"]))
+
         print(f"{'=' * 60}\n")
 
 
@@ -177,6 +287,44 @@ class JSONOutputFormatter:
                 "mag_azimuth_b_a": float(geo_data.mag_azimuth_b_a),
                 "mag_declination_a": float(geo_data.mag_declination_a),
                 "mag_declination_b": float(geo_data.mag_declination_b),
+            }
+
+        if "profile_data" in result.metadata:
+            profile_data = result.metadata["profile_data"]
+            
+            def intersection_to_dict_km(point):
+                return {
+                    "distance_km": point.distance_km,
+                    "elevation_sea_level_km": point.elevation_sea_level / 1000,
+                    "elevation_terrain_km": point.elevation_terrain / 1000,
+                }
+
+            output_dict["profile_data"] = {
+                "sight_lines": {
+                    "lower_a": profile_data.lines_of_sight.lower_a.tolist(),
+                    "lower_b": profile_data.lines_of_sight.lower_b.tolist(),
+                    "upper_a": profile_data.lines_of_sight.upper_a.tolist(),
+                    "upper_b": profile_data.lines_of_sight.upper_b.tolist(),
+                    "bisector_a": profile_data.lines_of_sight.bisector_a.tolist(),
+                    "bisector_b": profile_data.lines_of_sight.bisector_b.tolist(),
+                },
+                "intersections": {
+                    "lower": intersection_to_dict_km(profile_data.intersections.lower_intersection),
+                    "upper": intersection_to_dict_km(profile_data.intersections.upper_intersection),
+                    "cross_ab": intersection_to_dict_km(profile_data.intersections.cross_ab),
+                    "cross_ba": intersection_to_dict_km(profile_data.intersections.cross_ba),
+                },
+                "volume": {
+                    "cone_intersection_volume_m3": profile_data.volume.cone_intersection_volume_m3,
+                    "distance_a_to_cross_ab": profile_data.volume.distance_a_to_cross_ab,
+                    "distance_b_to_cross_ba": profile_data.volume.distance_b_to_cross_ba,
+                    "distance_between_crosses": profile_data.volume.distance_between_crosses,
+                    "distance_a_to_lower_intersection": profile_data.volume.distance_a_to_lower_intersection,
+                    "distance_b_to_lower_intersection": profile_data.volume.distance_b_to_lower_intersection,
+                    "distance_a_to_upper_intersection": profile_data.volume.distance_a_to_upper_intersection,
+                    "distance_b_to_upper_intersection": profile_data.volume.distance_b_to_upper_intersection,
+                    "distance_between_lower_upper_intersections": profile_data.volume.distance_between_lower_upper_intersections,
+                },
             }
 
         return json.dumps(output_dict, indent=2)
