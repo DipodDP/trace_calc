@@ -4,7 +4,7 @@ from typing import Any
 
 from trace_calc.domain.models.units import Angle, Degrees
 from trace_calc.domain.models.coordinates import Coordinates
-from trace_calc.application.services.base import (
+from trace_calc.domain.interfaces import (
     BaseDeclinationsApiClient,
     BaseElevationsApiClient,
 )

@@ -31,7 +31,7 @@ def sample_input_data():
         site_b_coordinates=Coordinates(50.1, 14.1),
         antenna_a_height=Meters(300.0),
         antenna_b_height=Meters(350.0),
-        elevation_angle_offset=Angle(0.0),  # Use zero offset for basic tests
+        hpbw=Angle(0.0),  # Use zero offset for basic tests
     )
 
 

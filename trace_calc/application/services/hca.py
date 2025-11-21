@@ -9,7 +9,7 @@ from trace_calc.domain.curvature import get_empirical_curvature_correction
 from trace_calc.domain.models.units import Angle, Degrees, Elevation, Kilometers, Meters
 from trace_calc.domain.models.coordinates import InputData
 from trace_calc.domain.models.path import HCAData, PathData
-from .base import BaseHCACalculator
+from trace_calc.domain.interfaces import BaseHCACalculator
 
 
 class ElevationsFilterFFT:

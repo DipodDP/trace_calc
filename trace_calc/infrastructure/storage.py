@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from pathlib import Path
 
 from trace_calc.domain.models.path import PathData
-from trace_calc.application.services.base import BasePathStorage
+from trace_calc.domain.interfaces import BasePathStorage
 
 
 class FilePathStorage(BasePathStorage):

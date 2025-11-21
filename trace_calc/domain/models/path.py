@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,32 +7,38 @@ from numpy.typing import NDArray
 from .units import Angle, Kilometers
 
 
-class IntersectionPoint(NamedTuple):
+@dataclass(slots=True)
+class IntersectionPoint:
     """Represents a point where two sight lines intersect."""
     distance_km: float
     elevation_sea_level: float
     elevation_terrain: float
+    angle: Optional[Angle] = None
 
 
-class SightLinesData(NamedTuple):
+@dataclass(slots=True)
+class SightLinesData:
     """Container for all four sight line equations."""
     lower_a: NDArray[np.float64]
     lower_b: NDArray[np.float64]
     upper_a: NDArray[np.float64]
     upper_b: NDArray[np.float64]
-    bisector_a: NDArray[np.float64]
-    bisector_b: NDArray[np.float64]
+    antenna_elevation_angle_a: NDArray[np.float64]
+    antenna_elevation_angle_b: NDArray[np.float64]
 
 
-class IntersectionsData(NamedTuple):
+@dataclass(slots=True)
+class IntersectionsData:
     """All intersection points between sight lines."""
-    lower_intersection: IntersectionPoint
-    upper_intersection: IntersectionPoint
+    lower: IntersectionPoint
+    upper: IntersectionPoint
     cross_ab: IntersectionPoint
     cross_ba: IntersectionPoint
+    beam_intersection_point: Optional[IntersectionPoint]
 
 
-class VolumeData(NamedTuple):
+@dataclass(slots=True)
+class VolumeData:
     """Volumetric and distance metrics for analysis region."""
     cone_intersection_volume_m3: float
     distance_a_to_cross_ab: float
@@ -43,6 +49,8 @@ class VolumeData(NamedTuple):
     distance_a_to_upper_intersection: float
     distance_b_to_upper_intersection: float
     distance_between_lower_upper_intersections: float
+    antenna_elevation_angle_a: Angle
+    antenna_elevation_angle_b: Angle
 
 
 @dataclass(slots=True)

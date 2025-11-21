@@ -26,14 +26,14 @@ class InputData:
     site_b_coordinates: Coordinates | None = None
     antenna_a_height: Meters = Meters(2)
     antenna_b_height: Meters = Meters(2)
-    elevation_angle_offset: Angle = Angle(2.5)
+    hpbw: Angle = Angle(2.5)
 
     def __post_init__(self):
-        if self.elevation_angle_offset < 0:
+        if self.hpbw < 0:
             raise ValueError(
-                "elevation_angle_offset must be non-negative"
+                "HPBW must be non-negative"
             )
-        if self.elevation_angle_offset > 45:
+        if self.hpbw > 45:
             raise ValueError(
-                "elevation_angle_offset must be <= 45 degrees"
+                "HPBW must be <= 45 degrees"
             )

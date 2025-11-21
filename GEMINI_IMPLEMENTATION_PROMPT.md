@@ -1,8 +1,8 @@
-# Implementation Task: Extended Terrain Visibility Analysis
+# Implementation Task: Common Volume Analysis
 
 ## Context
 
-You are implementing a feature to add advanced terrain visibility analysis to a radio path profiling system. A comprehensive implementation plan exists at `EXTENDED_VISIBILITY_IMPLEMENTATION_PLAN.md` in this directory.
+You are implementing a feature to add advanced terrain visibility analysis to a radio path profiling system. A comprehensive implementation plan exists at `COMMON_VOLUME_ANALYSIS_IMPLEMENTATION_PLAN.md` in this directory.
 
 ## Critical Constraints
 
@@ -216,7 +216,7 @@ def test_calculate_volume_metrics_consistency():
 **Tests to write first:**
 ```python
 def test_calculate_all_with_angle_offset():
-    """Test full calculation with angle offset"""
+    """Test full calculation with HPBW"""
 
 def test_calculate_all_zero_angle_backward_compat():
     """Test backward compatibility with zero offset"""
@@ -253,7 +253,7 @@ def test_plotter_legend_updated():
 ```
 
 **Implementation location:** `trace_calc/infrastructure/visualization/plotter.py`
-**Test location:** `tests/integration/test_extended_visibility.py` (visualization tests)
+**Test location:** `tests/integration/test_common_volume_analysis.py` (visualization tests)
 
 **Phase 4 Completion Criteria:**
 - [ ] Visualization tests pass
@@ -400,7 +400,7 @@ Implementation is complete when:
 ## Key Files Reference
 
 ### Implementation Plan:
-- `EXTENDED_VISIBILITY_IMPLEMENTATION_PLAN.md` - Complete specification
+- `COMMON_VOLUME_ANALYSIS_IMPLEMENTATION_PLAN.md` - Complete specification
 
 ### Current Project Structure:
 ```
@@ -427,7 +427,7 @@ tests/
 │   └── application/
 │       └── test_profile_data_calculator.py [MODIFY - Phase 3]
 └── integration/
-    └── test_extended_visibility.py [NEW - Phase 6]
+    └── test_common_volume_analysis.py [NEW - Phase 6]
 ```
 
 ## Working Directory

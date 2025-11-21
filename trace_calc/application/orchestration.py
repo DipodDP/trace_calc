@@ -28,6 +28,7 @@ class OrchestrationService:
         self,
         analysis_service: BaseAnalysisService,
         profile_service: PathProfileService,
+        declinations_api_client: BaseDeclinationsApiClient,
         output_formatter: Optional[OutputFormatter] = None,
         visualizer: Optional[ProfileVisualizer] = None,
     ):
@@ -42,6 +43,7 @@ class OrchestrationService:
         """
         self.analysis_service = analysis_service
         self.profile_service = profile_service
+        self.declinations_api_client = declinations_api_client
         self.output_formatter = output_formatter
         self.visualizer = visualizer
 
@@ -89,10 +91,20 @@ class OrchestrationService:
             antenna_b_height=antenna_b_height,
         )
 
+        # Always calculate GeoData
+        geo_data_service = GeoDataService(self.declinations_api_client)
+        geo_data = await geo_data_service.process(
+            input_data.site_a_coordinates,
+            input_data.site_b_coordinates
+        )
+        result.metadata["geo_data"] = geo_data  # Add geo_data to result metadata
+
         # Step 3: Display output (optional, injected dependency)
         if display_output and self.output_formatter:
             # Pass input_data to formatter for coordinates and other context
-            self.output_formatter.format_result(result, input_data=input_data)
+            self.output_formatter.format_result(
+                result, input_data=input_data, geo_data=geo_data
+            )
 
         # Step 4: Generate visualization (optional, injected dependency)
         if generate_plot and self.visualizer:

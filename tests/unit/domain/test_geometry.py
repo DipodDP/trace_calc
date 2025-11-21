@@ -44,10 +44,10 @@ class TestRotateLineByAngle:
     def test_rotate_descending_line(self):
         """Test rotating a descending line.
 
-        For descending lines (k < 0), SUBTRACTING the angle offset makes the angle
+        For descending lines (k < 0), SUBTRACTING the HPBW makes the angle
         more negative, which produces a steeper descent that geometrically moves the line UP.
         This is the correct behavior verified by the prototype implementation and the plan.
-        See EXTENDED_VISIBILITY_IMPLEMENTATION_PLAN.md section "CRITICAL IMPLEMENTATION CORRECTIONS".
+        See COMMON_VOLUME_ANALYSIS_IMPLEMENTATION_PLAN.md section "CRITICAL IMPLEMENTATION CORRECTIONS".
         """
         line_coeffs = np.array([-10.0, 100.0])  # y = -10x + 100
         pivot_point = (0.0, 100.0)
@@ -186,10 +186,10 @@ class TestCalculateConeIntersectionVolume:
         self.cross_ab_x = 200 / 0.3
         # cross_ba: 0.1x + 100 = -0.2x + 320 => 0.3x = 220 => x = 733.33
         self.cross_ba_x = 220 / 0.3
-        # lower_int: 0.1x + 100 = -0.1x + 300 => 0.2x = 200 => x = 1000
-        self.lower_intersection_x = 1000
-        # upper_int: 0.2x + 100 = -0.2x + 320 => 0.4x = 220 => x = 550
-        self.upper_intersection_x = 550
+        # lower_intersection: 0.1x + 100 = -0.1x + 300 => 0.2x = 200 => x = 1000
+        self.lower_x = 1000
+        # upper_intersection: 0.2x + 100 = -0.2x + 320 => 0.4x = 220 => x = 550
+        self.upper_x = 550
 
     def test_simple_volume(self):
         """Test a basic volume calculation."""
@@ -199,8 +199,8 @@ class TestCalculateConeIntersectionVolume:
             self.upper_a,
             self.upper_b,
             self.distances,
-            self.lower_intersection_x,
-            self.upper_intersection_x,
+            self.lower_x,
+            self.upper_x,
             self.cross_ab_x,
             self.cross_ba_x,
         )
@@ -215,8 +215,8 @@ class TestCalculateConeIntersectionVolume:
             self.upper_a,
             self.upper_b,
             self.distances,
-            self.lower_intersection_x,
-            self.upper_intersection_x,
+            self.lower_x,
+            self.upper_x,
             self.cross_ab_x,
             self.cross_ab_x,  # Same x for both cross intersections
         )
@@ -232,8 +232,8 @@ class TestCalculateConeIntersectionVolume:
                 self.lower_a,
                 self.upper_b,
                 self.distances,
-                self.lower_intersection_x,
-                self.upper_intersection_x,
+                self.lower_x,
+                self.upper_x,
                 self.cross_ab_x,
                 self.cross_ba_x,
             )

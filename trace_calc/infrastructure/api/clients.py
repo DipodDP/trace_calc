@@ -21,7 +21,9 @@ from trace_calc.application.services.base import (
 )
 from trace_calc.domain.exceptions import APIException
 
-logger = logging.getLogger(__name__)
+from trace_calc.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SyncElevationsApiClient(BaseElevationsApiClient):
@@ -43,7 +45,7 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
         response = requests.request(
             "GET", self.api_url, headers=headers, params=querystring
         )
-        logger.info("------- Got response -------", response.status_code)
+        logger.info(f"------- Got response ------- {response.status_code}")
 
         try:
             resp = json.loads(response.text)
@@ -127,7 +129,7 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         """
         Asynchronously retrieves elevation data in blocks for the given coordinate vector.
         """
-        logger.info(
+        logger.debug(
             f"fetch_elevations called with coord_vect.shape={coord_vect.shape}, block_size={block_size}"
         )
 
@@ -144,12 +146,12 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         coord_vect_blocks = [
             coord_vect[n * block_size : (n + 1) * block_size] for n in range(blocks_num)
         ]
-        logger.info(
+        logger.debug(
             f"Created {len(coord_vect_blocks)} block(s) with shapes: {[block.shape for block in coord_vect_blocks]}"
         )
 
         tasks = [self.elevations_api_request(block) for block in coord_vect_blocks]
-        logger.info(f"Created {len(tasks)} task(s) for async execution")
+        logger.debug(f"Created {len(tasks)} task(s) for async execution")
         results = await asyncio.gather(*tasks, return_exceptions=True)
         successes: list[list[Elevation]] = []
         errors = []
@@ -220,15 +222,12 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
                 "startMonth": month,
             }
         )
-        logger.info("------- Start fetching magnet declination -------")
+        logger.debug("------- Start fetching magnet declination -------")
         async with AsyncClient() as client:
             response = await client.get(self.api_url, params=params, timeout=10.0)
-
-            logger.info(
-                f"------- Got response for {response.request.url} -------",
-                response.status_code,
+            logger.debug(
+                f"------- Got response for {response.url} with status code {response.status_code} -------"
             )
-
             if not response.is_success:
                 try:
                     error_data = response.json()
@@ -264,7 +263,7 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
             else:
                 declinations.append(result)
 
-        logger.info(f"---- Got {len(results)} blocks -----")
+        logger.debug(f"---- Got {len(results)} blocks -----")
 
         if errors:
             raise APIException(errors)

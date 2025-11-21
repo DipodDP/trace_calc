@@ -1,7 +1,8 @@
 """Output formatting services for console display"""
 
-from typing import Protocol, Optional
 import json
+import numpy as np
+from typing import Protocol, Optional
 
 from trace_calc.domain.models.analysis import AnalysisResult
 from trace_calc.domain.models.coordinates import InputData
@@ -28,46 +29,64 @@ def format_common_volume_results(profile: ProfileData) -> str:
 
     # Lower sight lines
     output.append("\nLower Sight Lines:")
+    angle_a = np.degrees(np.arctan(sight_lines.lower_a[0] / 1000))
+    angle_b = np.degrees(np.arctan(-sight_lines.lower_b[0] / 1000))
     output.append(
         f"  Site A -> Obstacle: slope={sight_lines.lower_a[0]:.4f}, "
-        f"intercept={sight_lines.lower_a[1]/1000:.4f}km"
+        f"angle={angle_a:.2f}°"
     )
     output.append(
         f"  Site B -> Obstacle: slope={-sight_lines.lower_b[0]:.4f}, "
-        f"intercept={sight_lines.lower_b[1]/1000:.4f}km"
+        f"angle={angle_b:.2f}°"
     )
 
     # Upper sight lines
     output.append("\nUpper Sight Lines:")
+    angle_upper_a = np.degrees(np.arctan(sight_lines.upper_a[0] / 1000))
+    angle_upper_b = np.degrees(np.arctan(-sight_lines.upper_b[0] / 1000))
     output.append(
         f"  Site A (upper): slope={sight_lines.upper_a[0]:.4f}, "
-        f"intercept={sight_lines.upper_a[1]/1000:.4f}km"
+        f"angle={angle_upper_a:.2f}°"
     )
     output.append(
         f"  Site B (upper): slope={-sight_lines.upper_b[0]:.4f}, "
-        f"intercept={sight_lines.upper_b[1]/1000:.4f}km"
+        f"angle={angle_upper_b:.2f}°"
     )
 
-    # Bisectors
-    output.append("\nBisectors:")
+    # Beam Intersection Point
+    if intersections.beam_intersection_point:
+        output.append("\nBeam Intersection Point:")
+        output.append(
+            f"  Distance: {intersections.beam_intersection_point.distance_km:.2f} km, "
+            f"Elevation ASL: {intersections.beam_intersection_point.elevation_sea_level / 1000:.2f} km, "
+            f"Elevation above terrain: {intersections.beam_intersection_point.elevation_terrain / 1000:.2f} km, "
+            f"Angle: {intersections.beam_intersection_point.angle:.2f}°"
+            if intersections.beam_intersection_point.angle is not None
+            else "N/A"
+        )
+    else:
+        output.append("\nBeam Intersection Point: Not found within path.")
+
+    # Antenna Elevation Angles
+    output.append("\nAntenna Elevation Angles:")
     output.append(
-        f"  Bisector A starts at {profile.lines_of_sight.bisector_a[0]/1000:.4f}km and ends at {profile.lines_of_sight.bisector_a[-1]/1000:.4f}km"
+        f"  Antenna Elevation Angle A: {volume.antenna_elevation_angle_a:.2f}°"
     )
     output.append(
-        f"  Bisector B starts at {profile.lines_of_sight.bisector_b[0]/1000:.4f}km and ends at {profile.lines_of_sight.bisector_b[-1]/1000:.4f}km"
+        f"  Antenna Elevation Angle B: {volume.antenna_elevation_angle_b:.2f}°"
     )
 
     # Cross intersections
     output.append("\nCross Intersections:")
     output.append(
         f"  Upper A x Lower B: {intersections.cross_ab.distance_km:.2f} km, "
-        f"{intersections.cross_ab.elevation_sea_level/1000:.4f}km ASL, "
-        f"{intersections.cross_ab.elevation_terrain/1000:.4f}km above terrain"
+        f"{intersections.cross_ab.elevation_sea_level / 1000:.2f} km ASL, "
+        f"{intersections.cross_ab.elevation_terrain / 1000:.2f} km above terrain"
     )
     output.append(
         f"  Upper B x Lower A: {intersections.cross_ba.distance_km:.2f} km, "
-        f"{intersections.cross_ba.elevation_sea_level/1000:.4f}km ASL, "
-        f"{intersections.cross_ba.elevation_terrain/1000:.4f}km above terrain"
+        f"{intersections.cross_ba.elevation_sea_level / 1000:.2f} km ASL, "
+        f"{intersections.cross_ba.elevation_terrain / 1000:.2f} km above terrain"
     )
 
     # Volume metrics
@@ -85,14 +104,14 @@ def format_common_volume_results(profile: ProfileData) -> str:
         f"  Distance between cross intersections: {volume.distance_between_crosses:.2f} km"
     )
     output.append(
-        f"  Common volume top (upper intersection): {intersections.upper_intersection.distance_km:.2f} km, "
-        f"{intersections.upper_intersection.elevation_terrain/1000:.2f} km above terrain, "
-        f"{intersections.upper_intersection.elevation_sea_level/1000:.2f} km ASL"
+        f"  Common volume top (upper intersection): {intersections.upper.distance_km:.2f} km, "
+        f"{intersections.upper.elevation_terrain / 1000:.2f} km above terrain, "
+        f"{intersections.upper.elevation_sea_level / 1000:.2f} km ASL"
     )
     output.append(
-        f"  Common volume bottom (lower intersection): {intersections.lower_intersection.distance_km:.2f} km, "
-        f"{intersections.lower_intersection.elevation_terrain/1000:.2f} km above terrain, "
-        f"{intersections.lower_intersection.elevation_sea_level/1000:.2f} km ASL"
+        f"  Common volume bottom (lower intersection): {intersections.lower.distance_km:.2f} km, "
+        f"{intersections.lower.elevation_terrain / 1000:.2f} km above terrain, "
+        f"{intersections.lower.elevation_sea_level / 1000:.2f} km ASL"
     )
 
     # Distance metrics to lower/upper intersections
@@ -184,6 +203,19 @@ class ConsoleOutputFormatter:
             print(f"  True Azimuth B→A:        {geo_data.true_azimuth_b_a:.2f}°")
             print(f"  Mag Declination A:       {geo_data.mag_declination_a:.2f}°")
             print(f"  Mag Declination B:       {geo_data.mag_declination_b:.2f}°")
+            print(f"  Mag Azimuth A→B:         {geo_data.mag_azimuth_a_b:.2f}°")
+            print(f"  Mag Azimuth B→A:         {geo_data.mag_azimuth_b_a:.2f}°")
+
+        # HCA data section
+        if (
+            "b1_max" in result.metadata
+            and "b2_max" in result.metadata
+            and "b_sum" in result.metadata
+        ):
+            print("\n📐 Horizon Close Angles (HCA):")
+            print(f"  Site A (b1_max):         {result.metadata['b1_max']:.2f}°")
+            print(f"  Site B (b2_max):         {result.metadata['b2_max']:.2f}°")
+            print(f"  Sum (b_sum):             {result.metadata['b_sum']:.2f}°")
 
         print("\n📡 Link Parameters:")
         print(f"  Wavelength:              {result.wavelength:.4f} m")
@@ -291,28 +323,40 @@ class JSONOutputFormatter:
 
         if "profile_data" in result.metadata:
             profile_data = result.metadata["profile_data"]
-            
+
             def intersection_to_dict_km(point):
-                return {
+                data = {
                     "distance_km": point.distance_km,
                     "elevation_sea_level_km": point.elevation_sea_level / 1000,
                     "elevation_terrain_km": point.elevation_terrain / 1000,
                 }
+                if hasattr(point, "angle") and point.angle is not None:
+                    data["angle_deg"] = float(point.angle)
+                return data
 
             output_dict["profile_data"] = {
                 "sight_lines": {
-                    "lower_a": profile_data.lines_of_sight.lower_a.tolist(),
-                    "lower_b": profile_data.lines_of_sight.lower_b.tolist(),
-                    "upper_a": profile_data.lines_of_sight.upper_a.tolist(),
-                    "upper_b": profile_data.lines_of_sight.upper_b.tolist(),
-                    "bisector_a": profile_data.lines_of_sight.bisector_a.tolist(),
-                    "bisector_b": profile_data.lines_of_sight.bisector_b.tolist(),
+                    "lower_a_slope": profile_data.lines_of_sight.lower_a[0],
+                    "lower_b_slope": profile_data.lines_of_sight.lower_b[0],
+                    "upper_a_slope": profile_data.lines_of_sight.upper_a[0],
+                    "upper_b_slope": profile_data.lines_of_sight.upper_b[0],
                 },
                 "intersections": {
-                    "lower": intersection_to_dict_km(profile_data.intersections.lower_intersection),
-                    "upper": intersection_to_dict_km(profile_data.intersections.upper_intersection),
-                    "cross_ab": intersection_to_dict_km(profile_data.intersections.cross_ab),
-                    "cross_ba": intersection_to_dict_km(profile_data.intersections.cross_ba),
+                    "lower": intersection_to_dict_km(profile_data.intersections.lower),
+                    "upper": intersection_to_dict_km(profile_data.intersections.upper),
+                    "cross_ab": intersection_to_dict_km(
+                        profile_data.intersections.cross_ab
+                    ),
+                    "cross_ba": intersection_to_dict_km(
+                        profile_data.intersections.cross_ba
+                    ),
+                    "beam_intersection_point": (
+                        intersection_to_dict_km(
+                            profile_data.intersections.beam_intersection_point
+                        )
+                        if profile_data.intersections.beam_intersection_point
+                        else None
+                    ),
                 },
                 "volume": {
                     "cone_intersection_volume_m3": profile_data.volume.cone_intersection_volume_m3,
@@ -324,6 +368,12 @@ class JSONOutputFormatter:
                     "distance_a_to_upper_intersection": profile_data.volume.distance_a_to_upper_intersection,
                     "distance_b_to_upper_intersection": profile_data.volume.distance_b_to_upper_intersection,
                     "distance_between_lower_upper_intersections": profile_data.volume.distance_between_lower_upper_intersections,
+                    "antenna_elevation_angle_a": float(
+                        profile_data.volume.antenna_elevation_angle_a
+                    ),
+                    "antenna_elevation_angle_b": float(
+                        profile_data.volume.antenna_elevation_angle_b
+                    ),
                 },
             }
 

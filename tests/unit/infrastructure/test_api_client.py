@@ -2,10 +2,13 @@
 
 import pytest
 import numpy as np
+from unittest.mock import AsyncMock, MagicMock, patch
+import httpx # Import httpx
 
 from trace_calc.domain.models.coordinates import Coordinates, InputData
-from trace_calc.infrastructure.api.clients import AsyncElevationsApiClient
+from trace_calc.infrastructure.api.clients import AsyncElevationsApiClient, AsyncMagDeclinationApiClient
 from trace_calc.application.services.profile import PathProfileService
+from trace_calc.domain.exceptions import APIException
 
 
 @pytest.fixture
@@ -19,10 +22,18 @@ def sample_input_data():
 
 
 @pytest.fixture
-def api_client():
+def elevations_api_client():
     """Create API client for testing"""
     return AsyncElevationsApiClient(
         api_url="https://api.example.com/elevations", api_key="test_key"
+    )
+
+
+@pytest.fixture
+def mag_declination_api_client():
+    """Create magnetic declination API client for testing"""
+    return AsyncMagDeclinationApiClient(
+        api_url="https://api.example.com/declination", api_key="test_key"
     )
 
 
@@ -51,18 +62,18 @@ class ApiRequestTracker:
 
 
 @pytest.mark.asyncio
-async def test_api_request_count_with_256_block_size(sample_input_data, api_client):
+async def test_api_request_count_with_256_block_size(sample_input_data, elevations_api_client):
     """Test that correct number of API requests are made with block_size=256"""
     # Create tracker
     tracker = ApiRequestTracker()
 
     # Patch the API request method
-    api_client.elevations_api_request = tracker.create_tracked_method()
+    elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
     # Create profile service with block_size=256
     profile_service = PathProfileService(
         input_data=sample_input_data,
-        elevations_api_client=api_client,
+        elevations_api_client=elevations_api_client,
         block_size=256,
         resolution=0.5,
     )
@@ -72,7 +83,7 @@ async def test_api_request_count_with_256_block_size(sample_input_data, api_clie
     total_coords = coord_vect.shape[0]
 
     # Fetch elevations
-    elevations = await api_client.fetch_elevations(coord_vect, block_size=256)
+    elevations = await elevations_api_client.fetch_elevations(coord_vect, block_size=256)
 
     # Calculate expected number of blocks
     expected_blocks = total_coords // 256
@@ -92,15 +103,15 @@ async def test_api_request_count_with_256_block_size(sample_input_data, api_clie
 
 
 @pytest.mark.asyncio
-async def test_api_request_block_sizes(sample_input_data, api_client):
+async def test_api_request_block_sizes(sample_input_data, elevations_api_client):
     """Test that blocks are correctly sized (full blocks + potential partial block)"""
     tracker = ApiRequestTracker()
-    api_client.elevations_api_request = tracker.create_tracked_method()
+    elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
     block_size = 256
     profile_service = PathProfileService(
         input_data=sample_input_data,
-        elevations_api_client=api_client,
+        elevations_api_client=elevations_api_client,
         block_size=block_size,
         resolution=0.5,
     )
@@ -108,7 +119,7 @@ async def test_api_request_block_sizes(sample_input_data, api_client):
     coord_vect = profile_service.linspace_coord()
     total_coords = coord_vect.shape[0]
 
-    await api_client.fetch_elevations(coord_vect, block_size=block_size)
+    await elevations_api_client.fetch_elevations(coord_vect, block_size=block_size)
 
     # Check block sizes
     for i, size in enumerate(tracker.call_sizes[:-1]):
@@ -135,15 +146,15 @@ async def test_api_request_block_sizes(sample_input_data, api_client):
     ],
 )
 async def test_api_requests_with_different_parameters(
-    sample_input_data, api_client, block_size, resolution
+    sample_input_data, elevations_api_client, block_size, resolution
 ):
     """Test API requests with various block sizes and resolutions"""
     tracker = ApiRequestTracker()
-    api_client.elevations_api_request = tracker.create_tracked_method()
+    elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
     profile_service = PathProfileService(
         input_data=sample_input_data,
-        elevations_api_client=api_client,
+        elevations_api_client=elevations_api_client,
         block_size=block_size,
         resolution=resolution,
     )
@@ -151,7 +162,7 @@ async def test_api_requests_with_different_parameters(
     coord_vect = profile_service.linspace_coord()
     total_coords = coord_vect.shape[0]
 
-    elevations = await api_client.fetch_elevations(coord_vect, block_size=block_size)
+    elevations = await elevations_api_client.fetch_elevations(coord_vect, block_size=block_size)
 
     # Verify all coordinates got elevations
     assert len(elevations) == total_coords
@@ -163,20 +174,20 @@ async def test_api_requests_with_different_parameters(
 
 
 @pytest.mark.asyncio
-async def test_api_request_coordinate_continuity(sample_input_data, api_client):
+async def test_api_request_coordinate_continuity(sample_input_data, elevations_api_client):
     """Test that coordinates are passed to API in correct order"""
     tracker = ApiRequestTracker()
-    api_client.elevations_api_request = tracker.create_tracked_method()
+    elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
     profile_service = PathProfileService(
         input_data=sample_input_data,
-        elevations_api_client=api_client,
+        elevations_api_client=elevations_api_client,
         block_size=256,
         resolution=0.5,
     )
 
     coord_vect = profile_service.linspace_coord()
-    await api_client.fetch_elevations(coord_vect, block_size=256)
+    await elevations_api_client.fetch_elevations(coord_vect, block_size=256)
 
     # Verify first block starts with first coordinate
     assert np.allclose(tracker.call_coordinates[0]["first"], coord_vect[0]), (
@@ -201,7 +212,7 @@ async def test_api_request_coordinate_continuity(sample_input_data, api_client):
 
 
 @pytest.mark.asyncio
-async def test_single_block_request(api_client):
+async def test_single_block_request(elevations_api_client):
     """Test API request when total coordinates fit in a single block
 
     Note: PathProfileService generates coordinates in multiples of block_size,
@@ -215,13 +226,13 @@ async def test_single_block_request(api_client):
     )
 
     tracker = ApiRequestTracker()
-    api_client.elevations_api_request = tracker.create_tracked_method()
+    elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
     # Use a larger block size to ensure single block
     large_block_size = 1024
     profile_service = PathProfileService(
         input_data=input_data,
-        elevations_api_client=api_client,
+        elevations_api_client=elevations_api_client,
         block_size=large_block_size,
         resolution=0.5,
     )
@@ -232,7 +243,7 @@ async def test_single_block_request(api_client):
         f"Expected {large_block_size} coordinates (one block), got {coord_vect.shape[0]}"
     )
 
-    elevations = await api_client.fetch_elevations(
+    elevations = await elevations_api_client.fetch_elevations(
         coord_vect, block_size=large_block_size
     )
 
@@ -240,3 +251,23 @@ async def test_single_block_request(api_client):
     assert tracker.call_count == 1, f"Expected 1 request, got {tracker.call_count}"
     assert tracker.call_sizes[0] == coord_vect.shape[0]
     assert len(elevations) == coord_vect.shape[0]
+
+
+@pytest.mark.asyncio
+async def test_mag_declination_api_client_invalid_key_raises_exception(mag_declination_api_client):
+    """Test that AsyncMagDeclinationApiClient raises APIException for invalid key."""
+    mock_response = MagicMock()
+    mock_response.is_success = False
+    mock_response.status_code = 400
+    mock_response.json.return_value = {"message": "Bad request. Either the key parameter is missing or it is wrong."}
+    mock_response.text = "Bad request. Either the key parameter is missing or it is wrong."
+    mock_response.request.url = "http://mockurl.com" # Mock URL for logging
+
+    with patch("httpx.AsyncClient.get", AsyncMock(return_value=mock_response)):
+        dummy_coords = [Coordinates(lat=0.0, lon=0.0), Coordinates(lat=1.0, lon=1.0)]
+
+        with pytest.raises(APIException) as excinfo:
+            await mag_declination_api_client.fetch_declinations(dummy_coords)
+
+        assert "400 - Bad request. Either the key parameter is missing or it is wrong." in str(excinfo.value)
+

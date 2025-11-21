@@ -7,11 +7,13 @@ from numpy.typing import NDArray
 from trace_calc.domain.models.units import Kilometers
 from trace_calc.domain.models.coordinates import InputData
 from trace_calc.domain.models.path import PathData
-from .base import BaseElevationsApiClient
+from trace_calc.domain.interfaces import BaseElevationsApiClient
 from .coordinates import CoordinatesService
 from trace_calc.domain.exceptions import CoordinatesRequiredException
 
-logger = logging.getLogger(__name__)
+from trace_calc.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class PathProfileService:
@@ -68,7 +70,7 @@ class PathProfileService:
         """
         self.coord_vect = self.linspace_coord()
         points_num = self.coord_vect.shape[0]
-        logger.info(f"Coordinates: {self.coord_a} {self.coord_b}")
+        logger.debug(f"Coordinates: {self.coord_a} {self.coord_b}")
 
         coordinates_service = CoordinatesService(self.coord_a, self.coord_b)
         full_distance: Kilometers = coordinates_service.get_distance()

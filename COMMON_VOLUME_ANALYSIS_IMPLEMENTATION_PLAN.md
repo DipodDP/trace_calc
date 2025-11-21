@@ -16,7 +16,7 @@ The system currently:
 ### Enhancement Goals
 
 Add capability to:
-1. Generate upper sight lines with configurable elevation angle offset
+1. Generate upper sight lines with configurable HPBW
 2. Calculate 4 intersection points: Lower_A×Lower_B, Upper_A×Upper_B, Upper_A×Lower_B, Upper_B×Lower_A
 3. Compute intersection heights relative to sea level and terrain
 4. Calculate volume of 3D cone intersection region
@@ -34,7 +34,7 @@ Add capability to:
 **Domain Layer** (Pure business logic, no dependencies)
 - `trace_calc/domain/geometry.py` - NEW: Geometric calculations
 - `trace_calc/domain/models/path.py` - MODIFIED: Extended data structures
-- `trace_calc/domain/models/input.py` - MODIFIED: Add angle offset parameter
+- `trace_calc/domain/models/input.py` - MODIFIED: Add HPBW parameter
 
 **Application Layer** (Use cases, orchestration)
 - `trace_calc/application/services/profile_data_calculator.py` - MODIFIED: Extended calculations
@@ -47,7 +47,7 @@ Add capability to:
 **Test Layer**
 - `tests/unit/domain/test_geometry.py` - NEW: Geometry unit tests
 - `tests/unit/application/test_profile_data_calculator.py` - MODIFIED: Extended tests
-- `tests/integration/test_extended_visibility.py` - NEW: Integration tests
+- `tests/integration/test_common_volume_analysis.py` - NEW: Integration tests
 
 ### Design Principles
 
@@ -320,7 +320,7 @@ Critical Implementation Notes:
     calculated from geometric slopes (m/m). Failure to convert will result in
     angles near 90° and incorrect rotations.
   - **Descending Lines Need Opposite Rotation**: For lines with negative slopes
-    (descending from right to left), subtracting the angle offset keeps the upper
+    (descending from right to left), subtracting the HPBW keeps the upper
     line geometrically above the lower line. Adding the offset would flip the line
     to ascending and place it below.
   - **Verification**: After rotation, verify that upper line is above lower line
@@ -658,7 +658,7 @@ Algorithm:
      )
      Validate: x in [0, distances[-1]]
      h = geometry.calculate_height_above_terrain(x, y, distances, elevations)
-     lower_int = IntersectionPoint(x, y, h)
+     lower_intersection = IntersectionPoint(x, y, h)
 
   2. Calculate upper intersection:
      [Same process with upper_a, upper_b]
@@ -669,7 +669,7 @@ Algorithm:
   4. Calculate cross_ba:
      [Same process with upper_b, lower_a]
 
-  5. Return IntersectionsData(lower_int, upper_int, cross_ab, cross_ba)
+  5. Return IntersectionsData(lower_intersection, upper_intersection, cross_ab, cross_ba)
 
 Validation:
   - Each intersection must be within path bounds
@@ -702,8 +702,8 @@ Algorithm:
        sight_lines.upper_a,
        sight_lines.upper_b,
        distances,
-       intersections.lower_intersection.distance_km,
-       intersections.upper_intersection.distance_km,
+       intersections.lower.distance_km,
+       intersections.upper.distance_km,
        intersections.cross_ab.distance_km,
        intersections.cross_ba.distance_km
      )
@@ -826,15 +826,15 @@ After plotting lower sight lines in Panel 2:
 5. Plot intersection points:
    # Lower intersection (existing, may need relabel)
    ax.scatter(
-     intersections.lower_intersection.distance_km,
-     intersections.lower_intersection.elevation_sea_level,
+     intersections.lower.distance_km,
+     intersections.lower.elevation_sea_level,
      c='green', s=100, marker='o', label='Lower intersection', zorder=5
    )
 
    # Upper intersection
    ax.scatter(
-     intersections.upper_intersection.distance_km,
-     intersections.upper_intersection.elevation_sea_level,
+     intersections.upper.distance_km,
+     intersections.upper.elevation_sea_level,
      c='purple', s=100, marker='o', label='Upper intersection', zorder=5
    )
 
@@ -858,8 +858,8 @@ After plotting lower sight lines in Panel 2:
 7. Scale y-axis to include all intersections:
    # Collect all y-values that need to be visible
    all_y_values = [
-     intersections.lower_intersection.elevation_sea_level,
-     intersections.upper_intersection.elevation_sea_level,
+     intersections.lower.elevation_sea_level,
+     intersections.upper.elevation_sea_level,
      intersections.cross_ab.elevation_sea_level,
      intersections.cross_ba.elevation_sea_level,
      elevations_curved.max(),
@@ -881,7 +881,7 @@ CRITICAL: Baseline Handling and Sea Level Reference
     filled from 0 to elevation values.
   - **Y-axis scaling**: Scale the y-axis to include all intersection points,
     especially the upper intersection which may be thousands of meters above terrain.
-  - **Why this matters**: Extended visibility analysis creates intersection points
+  - **Why this matters**: Common Volume Analysis creates intersection points
     that can be far above the terrain. Without proper scaling and sea level reference,
     the plot becomes confusing and appears to show negative elevations.
 
@@ -904,7 +904,7 @@ New Function: `format_extended_visibility_results(profile: ProfileData) -> str`
 
 Output Format:
 ```
-=== Extended Terrain Visibility Analysis ===
+=== Common Volume Analysis ===
 
 Lower Sight Lines:
   Site A → Obstacle: slope=0.0234, intercept=123.45m
@@ -1044,7 +1044,7 @@ New/Modified Tests:
 
 ### Integration Tests
 
-Location: `tests/integration/test_extended_visibility.py`
+Location: `tests/integration/test_common_volume_analysis.py`
 
 Test Cases:
 1. test_end_to_end_with_real_coordinates
@@ -1349,14 +1349,14 @@ FUNCTION calculate_extended_visibility_profile(
     h_low = calculate_height_above_terrain(
         x_low, y_low, distances, elevations_curved
     )
-    lower_int = IntersectionPoint(x_low, y_low, h_low)
+    lower_intersection = IntersectionPoint(x_low, y_low, h_low)
 
     # Upper intersection
     x_up, y_up = find_line_intersection(upper_a, upper_b)
     h_up = calculate_height_above_terrain(
         x_up, y_up, distances, elevations_curved
     )
-    upper_int = IntersectionPoint(x_up, y_up, h_up)
+    upper_intersection = IntersectionPoint(x_up, y_up, h_up)
 
     # Cross AB intersection
     x_ab, y_ab = find_line_intersection(upper_a, lower_b)
@@ -1373,7 +1373,7 @@ FUNCTION calculate_extended_visibility_profile(
     cross_ba = IntersectionPoint(x_ba, y_ba, h_ba)
 
     intersections = IntersectionsData(
-        lower_int, upper_int, cross_ab, cross_ba
+        lower_intersection, upper_intersection, cross_ab, cross_ba
     )
 
     # Phase 7: Calculate volume (NEW)
@@ -1406,7 +1406,7 @@ END FUNCTION
 
 ## Implementation Instructions for Gemini
 
-This guide provides step-by-step instructions for implementing the extended terrain visibility analysis feature. Follow each step exactly in the order presented.
+This guide provides step-by-step instructions for implementing the Common Volume Analysis feature. Follow each step exactly in the order presented.
 
 ---
 
@@ -1665,14 +1665,14 @@ def _calculate_all_intersections(
     if x < 0 or x > distances[-1]:
         raise ValueError(f"Lower intersection at {x} km is outside path bounds")
     h_terrain = geometry.calculate_height_above_terrain(x, y, distances, elevations)
-    lower_int = IntersectionPoint(x, y, h_terrain)
+    lower_intersection = IntersectionPoint(x, y, h_terrain)
 
     # Upper intersection
     x, y = geometry.find_line_intersection(sight_lines.upper_a, sight_lines.upper_b)
     if x < 0 or x > distances[-1]:
         raise ValueError(f"Upper intersection at {x} km is outside path bounds")
     h_terrain = geometry.calculate_height_above_terrain(x, y, distances, elevations)
-    upper_int = IntersectionPoint(x, y, h_terrain)
+    upper_intersection = IntersectionPoint(x, y, h_terrain)
 
     # Cross AB intersection
     x, y = geometry.find_line_intersection(sight_lines.upper_a, sight_lines.lower_b)
@@ -1688,7 +1688,7 @@ def _calculate_all_intersections(
     h_terrain = geometry.calculate_height_above_terrain(x, y, distances, elevations)
     cross_ba = IntersectionPoint(x, y, h_terrain)
 
-    return IntersectionsData(lower_int, upper_int, cross_ab, cross_ba)
+    return IntersectionsData(lower_intersection, upper_intersection, cross_ab, cross_ba)
 ```
 
 **Verification:**
@@ -1732,8 +1732,8 @@ def _calculate_volume_metrics(
         sight_lines.upper_a,
         sight_lines.upper_b,
         distances,
-        intersections.lower_intersection.distance_km,
-        intersections.upper_intersection.distance_km,
+        intersections.lower.distance_km,
+        intersections.upper.distance_km,
         intersections.cross_ab.distance_km,
         intersections.cross_ba.distance_km
     )
@@ -1888,15 +1888,15 @@ intersections = profile.intersections
 
 # Lower intersection
 ax.scatter(
-    intersections.lower_intersection.distance_km,
-    intersections.lower_intersection.elevation_sea_level,
+    intersections.lower.distance_km,
+    intersections.lower.elevation_sea_level,
     c='green', s=100, marker='o', label='Lower intersection', zorder=5
 )
 
 # Upper intersection
 ax.scatter(
-    intersections.upper_intersection.distance_km,
-    intersections.upper_intersection.elevation_sea_level,
+    intersections.upper.distance_km,
+    intersections.upper.elevation_sea_level,
     c='purple', s=100, marker='o', label='Upper intersection', zorder=5
 )
 
@@ -1952,7 +1952,7 @@ from trace_calc.domain.models.path import IntersectionsData, ProfileData, Volume
 
 ## Step 13: Update Console Output - Add Formatting Function
 
-**Task:** Add function to format extended visibility results
+**Task:** Add function to format Common Volume Analysis results
 
 **Action:** Edit file `trace_calc/infrastructure/output/console_output.py`
 
@@ -1963,7 +1963,7 @@ from trace_calc.domain.models.path import IntersectionsData, ProfileData, Volume
 ```python
 def format_extended_visibility_results(profile: ProfileData) -> str:
     """
-    Format extended visibility analysis results for console output.
+    Format Common Volume Analysis analysis results for console output.
 
     Args:
         profile: Complete profile data with intersections and volume
@@ -1976,7 +1976,7 @@ def format_extended_visibility_results(profile: ProfileData) -> str:
     volume = profile.volume
 
     output = []
-    output.append("\n=== Extended Terrain Visibility Analysis ===\n")
+    output.append("\n=== Common Volume Analysis ===\n")
 
     # Lower sight lines
     output.append("Lower Sight Lines:")
@@ -1984,9 +1984,9 @@ def format_extended_visibility_results(profile: ProfileData) -> str:
                   f"intercept={sight_lines.lower_a[1]:.2f}m")
     output.append(f"  Site B → Obstacle: slope={sight_lines.lower_b[0]:.4f}, "
                   f"intercept={sight_lines.lower_b[1]:.2f}m")
-    output.append(f"  Intersection: {intersections.lower_intersection.distance_km:.3f} km, "
-                  f"{intersections.lower_intersection.elevation_sea_level:.2f}m ASL, "
-                  f"+{intersections.lower_intersection.elevation_terrain:.2f}m above terrain\n")
+    output.append(f"  Intersection: {intersections.lower.distance_km:.3f} km, "
+                  f"{intersections.lower.elevation_sea_level:.2f}m ASL, "
+                  f"+{intersections.lower.elevation_terrain:.2f}m above terrain\n")
 
     # Upper sight lines
     output.append("Upper Sight Lines:")
@@ -1994,9 +1994,9 @@ def format_extended_visibility_results(profile: ProfileData) -> str:
                   f"intercept={sight_lines.upper_a[1]:.2f}m")
     output.append(f"  Site B (upper): slope={sight_lines.upper_b[0]:.4f}, "
                   f"intercept={sight_lines.upper_b[1]:.2f}m")
-    output.append(f"  Intersection: {intersections.upper_intersection.distance_km:.3f} km, "
-                  f"{intersections.upper_intersection.elevation_sea_level:.2f}m ASL, "
-                  f"+{intersections.upper_intersection.elevation_terrain:.2f}m above terrain\n")
+    output.append(f"  Intersection: {intersections.upper.distance_km:.3f} km, "
+                  f"{intersections.upper.elevation_sea_level:.2f}m ASL, "
+                  f"+{intersections.upper.elevation_terrain:.2f}m above terrain\n")
 
     # Cross intersections
     output.append("Cross Intersections:")
@@ -2045,14 +2045,14 @@ def format_extended_visibility_results(profile: ProfileData) -> str:
 },
 "intersections": {
     "lower": {
-        "distance_km": profile.intersections.lower_intersection.distance_km,
-        "elevation_sea_level": profile.intersections.lower_intersection.elevation_sea_level,
-        "elevation_terrain": profile.intersections.lower_intersection.elevation_terrain
+        "distance_km": profile.intersections.lower.distance_km,
+        "elevation_sea_level": profile.intersections.lower.elevation_sea_level,
+        "elevation_terrain": profile.intersections.lower.elevation_terrain
     },
     "upper": {
-        "distance_km": profile.intersections.upper_intersection.distance_km,
-        "elevation_sea_level": profile.intersections.upper_intersection.elevation_sea_level,
-        "elevation_terrain": profile.intersections.upper_intersection.elevation_terrain
+        "distance_km": profile.intersections.upper.distance_km,
+        "elevation_sea_level": profile.intersections.upper.elevation_sea_level,
+        "elevation_terrain": profile.intersections.upper.elevation_terrain
     },
     "cross_ab": {
         "distance_km": profile.intersections.cross_ab.distance_km,
@@ -2147,7 +2147,7 @@ def test_calculate_volume_metrics(self):
     pass  # Implement based on existing test patterns
 
 def test_calculate_all_with_angle_offset(self):
-    """Test full calculation with angle offset."""
+    """Test full calculation with HPBW."""
     # Setup: Mock all dependencies
     # Call calculate_all with angle_offset=2.5
     # Verify: ProfileData has all new fields populated
@@ -2173,14 +2173,14 @@ def test_calculate_all_zero_angle_offset(self):
 
 **Task:** Create end-to-end integration tests
 
-**Action:** Create file `tests/integration/test_extended_visibility.py`
+**Action:** Create file `tests/integration/test_common_volume_analysis.py`
 
 **Content:** Include tests for:
 1. End-to-end calculation with real coordinates
 2. Visualization generation
 3. Console output formatting
 4. JSON output validation
-5. Different angle offset values
+5. Different HPBW values
 
 **Required Imports:**
 ```python
@@ -2195,7 +2195,7 @@ from trace_calc.domain.models.units import Angle
 ```
 
 **Verification:**
-- Run: `python -m pytest tests/integration/test_extended_visibility.py -v`
+- Run: `python -m pytest tests/integration/test_common_volume_analysis.py -v`
 - All tests should pass
 
 ---
@@ -2264,7 +2264,7 @@ python -m pylint trace_calc/ --errors-only
 **Actions:**
 
 1. **Update README (if present):**
-   - Add section describing extended visibility analysis
+   - Add section describing Common Volume Analysis analysis
    - Document elevation_angle_offset parameter
    - Provide usage examples
 
@@ -2330,7 +2330,7 @@ input_data = CalculationInput(
 - [ ] All new files created:
   - trace_calc/domain/geometry.py
   - tests/unit/domain/test_geometry.py
-  - tests/integration/test_extended_visibility.py
+  - tests/integration/test_common_volume_analysis.py
 
 - [ ] All modified files updated correctly:
   - trace_calc/domain/models/path.py
@@ -2412,9 +2412,9 @@ After successful implementation:
 1. **Commit Changes:**
    ```bash
    git add .
-   git commit -m "feat: Add extended terrain visibility analysis
+   git commit -m "feat: Add Common Volume Analysis
 
-   - Add upper sight lines with configurable angle offset
+   - Add upper sight lines with configurable HPBW
    - Calculate 4 intersection points
    - Compute cone intersection volume
    - Enhance visualization with all intersections
@@ -2522,14 +2522,14 @@ negative elevations.
 
 **Problem:**
 Auto-scaling to terrain alone (0-669m in test data) hides the upper intersection point
-(~4721m in test data), making the extended visibility analysis invisible.
+(~4721m in test data), making the Common Volume Analysis analysis invisible.
 
 **Solution:**
 ```python
 # Collect ALL relevant y-values
 all_y = [
-    intersections.lower_intersection.elevation_sea_level,
-    intersections.upper_intersection.elevation_sea_level,
+    intersections.lower.elevation_sea_level,
+    intersections.upper.elevation_sea_level,
     intersections.cross_ab.elevation_sea_level,
     intersections.cross_ba.elevation_sea_level,
     elevations.max(),
@@ -2540,7 +2540,7 @@ all_y = [
 ax.set_ylim(min(all_y) - 100, max(all_y) + 100)
 ```
 
-**Impact:** Without explicit scaling, the primary feature of extended visibility (the upper
+**Impact:** Without explicit scaling, the primary feature of Common Volume Analysis (the upper
 intersection and visibility cone) will be cut off and invisible in plots.
 
 ### Verification Checklist

@@ -61,6 +61,7 @@ from trace_calc.domain.models.path import (
     ProfileData,
     ProfileViewData,
 )
+from trace_calc.domain.models.units import Angle
 
 
 def test_intersection_point_creation():
@@ -80,8 +81,8 @@ def test_sight_lines_data_creation():
         lower_b=np.array([2, 2]),
         upper_a=np.array([3, 3]),
         upper_b=np.array([4, 4]),
-        bisector_a=np.array([]),
-        bisector_b=np.array([]),
+        antenna_elevation_angle_a=np.array([]),
+        antenna_elevation_angle_b=np.array([]),
     )
     np.testing.assert_array_equal(s.lower_a, np.array([1, 1]))
     np.testing.assert_array_equal(s.lower_b, np.array([2, 2]))
@@ -96,12 +97,17 @@ def test_intersections_data_creation():
     p3 = IntersectionPoint(7, 8, 9)
     p4 = IntersectionPoint(10, 11, 12)
     i = IntersectionsData(
-        lower_intersection=p1, upper_intersection=p2, cross_ab=p3, cross_ba=p4
+        lower=p1,
+        upper=p2,
+        cross_ab=p3,
+        cross_ba=p4,
+        beam_intersection_point=None,
     )
-    assert i.lower_intersection == p1
-    assert i.upper_intersection == p2
+    assert i.lower == p1
+    assert i.upper == p2
     assert i.cross_ab == p3
     assert i.cross_ba == p4
+    assert i.beam_intersection_point is None
 
 
 def test_volume_data_creation():
@@ -116,6 +122,8 @@ def test_volume_data_creation():
         distance_a_to_upper_intersection=7.0,
         distance_b_to_upper_intersection=13.0,
         distance_between_lower_upper_intersections=2.0,
+        antenna_elevation_angle_a=Angle(0.0),
+        antenna_elevation_angle_b=Angle(0.0),
     )
     assert v.cone_intersection_volume_m3 == 1000.0
     assert v.distance_a_to_cross_ab == 10.0
@@ -126,6 +134,8 @@ def test_volume_data_creation():
     assert v.distance_a_to_upper_intersection == 7.0
     assert v.distance_b_to_upper_intersection == 13.0
     assert v.distance_between_lower_upper_intersections == 2.0
+    assert v.antenna_elevation_angle_a == Angle(0.0)
+    assert v.antenna_elevation_angle_b == Angle(0.0)
 
 
 def test_profile_data_with_new_fields():
@@ -136,12 +146,23 @@ def test_profile_data_with_new_fields():
         lower_b=np.array([2, 2]),
         upper_a=np.array([3, 3]),
         upper_b=np.array([4, 4]),
-        bisector_a=np.array([]),
-        bisector_b=np.array([]),
+        antenna_elevation_angle_a=np.array([]),
+        antenna_elevation_angle_b=np.array([]),
     )
     int_p = IntersectionPoint(1, 2, 3)
-    int_data = IntersectionsData(int_p, int_p, int_p, int_p)
-    vol_data = VolumeData(1, 2, 3, 4, 5, 6, 7, 8, 9)
+    int_data = IntersectionsData(int_p, int_p, int_p, int_p, beam_intersection_point=None)
+    vol_data = VolumeData(
+        cone_intersection_volume_m3=1,
+        distance_a_to_cross_ab=2,
+        distance_b_to_cross_ba=3,
+        distance_between_crosses=4,
+        distance_a_to_lower_intersection=5,
+        distance_b_to_lower_intersection=6,
+        distance_a_to_upper_intersection=7,
+        distance_b_to_upper_intersection=8,
+        distance_between_lower_upper_intersections=9,
+        antenna_elevation_angle_a=Angle(0.0),
+        antenna_elevation_angle_b=Angle(0.0))
 
     profile_data = ProfileData(
         plain=pvd,

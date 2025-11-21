@@ -52,8 +52,8 @@ class TestProfileDataCalculatorExtensions:
             lower_b=np.array([-100.0, 11000]),
             upper_a=np.array([200.0, 100]),
             upper_b=np.array([-200.0, 11200]),
-            bisector_a=np.array([]),
-            bisector_b=np.array([]),
+            antenna_elevation_angle_a=np.array([]),
+            antenna_elevation_angle_b=np.array([]),
         )
         # lower: 100x + 100 = -100x + 11000 => 200x = 10900 => x = 54.5
         # upper: 200x + 100 = -200x + 11200 => 400x = 11100 => x = 27.75
@@ -70,13 +70,13 @@ class TestProfileDataCalculatorExtensions:
         )
 
         assert isinstance(intersections, IntersectionsData)
-        assert isinstance(intersections.lower_intersection, IntersectionPoint)
-        assert isinstance(intersections.upper_intersection, IntersectionPoint)
+        assert isinstance(intersections.lower, IntersectionPoint)
+        assert isinstance(intersections.upper, IntersectionPoint)
         assert isinstance(intersections.cross_ab, IntersectionPoint)
         assert isinstance(intersections.cross_ba, IntersectionPoint)
 
-        assert np.isclose(intersections.lower_intersection.distance_km, 54.5)
-        assert np.isclose(intersections.upper_intersection.distance_km, 27.75)
+        assert np.isclose(intersections.lower.distance_km, 54.5)
+        assert np.isclose(intersections.upper.distance_km, 27.75)
         assert np.isclose(intersections.cross_ab.distance_km, 109.0 / 3.0)
         assert np.isclose(intersections.cross_ba.distance_km, 37.0)
 
@@ -87,8 +87,8 @@ class TestProfileDataCalculatorExtensions:
             lower_b=np.array([-0.1, 102]),  # Intersection at x=10
             upper_a=np.array([0.2, 100]),
             upper_b=np.array([-0.2, 108]),  # Intersection at x=20
-            bisector_a=np.array([]),
-            bisector_b=np.array([]),
+            antenna_elevation_angle_a=np.array([]),
+            antenna_elevation_angle_b=np.array([]),
         )
 
         # Path is only 5 km long
@@ -107,18 +107,19 @@ class TestProfileDataCalculatorExtensions:
             lower_b=np.array([-0.1, 200]),
             upper_a=np.array([0.2, 100]),
             upper_b=np.array([-0.2, 220]),
-            bisector_a=np.array([]),
-            bisector_b=np.array([]),
+            antenna_elevation_angle_a=np.array([]),
+            antenna_elevation_angle_b=np.array([]),
         )
         # lower: x=250, y=125
         # upper: x=300, y=160
         # cross_ab: x=333.33, y=166.67
         # cross_ba: x=200, y=120
         self.intersections = IntersectionsData(
-            lower_intersection=IntersectionPoint(250, 125, 25),
-            upper_intersection=IntersectionPoint(300, 160, 60),
+            lower=IntersectionPoint(250, 125, 25),
+            upper=IntersectionPoint(300, 160, 60),
             cross_ab=IntersectionPoint(1000 / 3, 500 / 3, 100),
             cross_ba=IntersectionPoint(200, 120, 20),
+            beam_intersection_point=None,
         )
         self.distances_vol = np.linspace(0, 500, 500)
         self.calculator_vol = ProfileDataCalculator(
@@ -176,37 +177,47 @@ class TestProfileDataCalculatorExtensions:
         assert isinstance(profile_data.lines_of_sight, SightLinesData)
         assert isinstance(profile_data.intersections, IntersectionsData)
         assert isinstance(profile_data.volume, VolumeData)
-        assert isinstance(profile_data.lines_of_sight.bisector_a, np.ndarray)
-        assert isinstance(profile_data.lines_of_sight.bisector_b, np.ndarray)
+        assert isinstance(
+            profile_data.lines_of_sight.antenna_elevation_angle_a, np.ndarray
+        )
+        assert isinstance(
+            profile_data.lines_of_sight.antenna_elevation_angle_b, np.ndarray
+        )
 
-    def test_calculate_bisectors(self):
-        """Test that bisectors are the average of upper and lower lines."""
+    def test_calculate_antenna_elevation_angle_lines(self):
+        """Test that antenna elevation angle lines are the average of upper and lower lines."""
         sight_lines = SightLinesData(
             lower_a=np.array([0.1, 100]),
             lower_b=np.array([-0.1, 200]),
             upper_a=np.array([0.2, 100]),
             upper_b=np.array([-0.2, 220]),
-            bisector_a=np.array([]),
-            bisector_b=np.array([]),
+            antenna_elevation_angle_a=np.array([]),
+            antenna_elevation_angle_b=np.array([]),
         )
         distances = np.linspace(0, 100, 101)
         calculator = ProfileDataCalculator(distances, np.zeros_like(distances))
 
-        bisector_a, bisector_b = calculator._calculate_bisectors(sight_lines, distances)
+        antenna_elevation_angle_a, antenna_elevation_angle_b = (
+            calculator._calculate_antenna_elevation_angle_lines(sight_lines, distances)
+        )
 
         y_lower_a = np.polyval(sight_lines.lower_a, distances)
         y_upper_a = np.polyval(sight_lines.upper_a, distances)
-        expected_bisector_a = (y_lower_a + y_upper_a) / 2
+        expected_antenna_elevation_angle_a = (y_lower_a + y_upper_a) / 2
 
         y_lower_b = np.polyval(sight_lines.lower_b, distances)
         y_upper_b = np.polyval(sight_lines.upper_b, distances)
-        expected_bisector_b = (y_lower_b + y_upper_b) / 2
+        expected_antenna_elevation_angle_b = (y_lower_b + y_upper_b) / 2
 
-        np.testing.assert_allclose(bisector_a, expected_bisector_a)
-        np.testing.assert_allclose(bisector_b, expected_bisector_b)
+        np.testing.assert_allclose(
+            antenna_elevation_angle_a, expected_antenna_elevation_angle_a
+        )
+        np.testing.assert_allclose(
+            antenna_elevation_angle_b, expected_antenna_elevation_angle_b
+        )
 
     def test_calculate_all_with_angle_offset(self):
-        """Test full calculation with angle offset"""
+        """Test full calculation with HPBW"""
         hca_indices = (50, 50)
         height_offsets = (Meters(2), Meters(40))  # User requested antenna heights
         angle_offset = Angle(2.5)  # User requested offset
@@ -270,23 +281,25 @@ class TestProfileDataCalculatorExtensions:
             # Dummy upper lines, not used in this part of the test
             upper_a=np.array([1.0, 0.0]),
             upper_b=np.array([-1.0, 100.0]),
-            bisector_a=np.array([]),
-            bisector_b=np.array([]),
+            antenna_elevation_angle_a=np.array([]),
+            antenna_elevation_angle_b=np.array([]),
         )
 
         # Expected values
-        x_intersect = 50.0
+        x_intersectionersect = 50.0
         y_flat = 50.0
 
         # Earth drop correction: drop = x^2 / (2R)
         # R = 6371 km. drop is in km, convert to meters.
-        earth_drop_m = (x_intersect**2 / (2 * 6371)) * 1000
+        earth_drop_m = (x_intersectionersect**2 / (2 * 6371)) * 1000
         expected_elevation_sea_level = y_flat - earth_drop_m
 
         # Terrain height correction: bulge = x(d-x) / (2R)
         # For a flat terrain, the curved profile is just the bulge.
         d = distances[-1]
-        terrain_bulge_m = (x_intersect * (d - x_intersect) / (2 * 6371)) * 1000
+        terrain_bulge_m = (
+            x_intersectionersect * (d - x_intersectionersect) / (2 * 6371)
+        ) * 1000
 
         # For a flat terrain at 0m, the height above terrain should equal the height
         # above sea level.
@@ -299,10 +312,63 @@ class TestProfileDataCalculatorExtensions:
         )
 
         # We test the 'lower' intersection, but all are the same here.
-        lower_int = intersections.lower_intersection
+        lower_intersection = intersections.lower
 
-        assert lower_int.distance_km == pytest.approx(x_intersect)
-        assert lower_int.elevation_sea_level == pytest.approx(
+        assert lower_intersection.distance_km == pytest.approx(x_intersectionersect)
+        assert lower_intersection.elevation_sea_level == pytest.approx(
             expected_elevation_sea_level
         )
-        assert lower_int.elevation_terrain == pytest.approx(expected_elevation_terrain)
+        assert lower_intersection.elevation_terrain == pytest.approx(
+            expected_elevation_terrain
+        )
+
+    def test_beam_intersection_point_and_angles(self):
+        """Test calculation of antenna elevation angle intersection and angles with correct units."""
+        # 1. Setup
+        distances = np.linspace(0, 100, 101)
+        elevations = np.zeros_like(distances)  # Flat terrain at 0m
+        calculator = ProfileDataCalculator(distances, elevations)
+        elevations_curved, _ = calculator.curved_profile()
+
+        # Define antenna elevation angle lines based on y = 1.5x + 100 and y = -1.5x + 250
+        # Note: Slopes here are m/km, which is what the old code assumed for angle calcs
+        antenna_elevation_angle_a_coeffs = np.array([1.5, 100])
+        antenna_elevation_angle_b_coeffs = np.array([-1.5, 250])
+        antenna_elevation_angle_a_vals = np.polyval(
+            antenna_elevation_angle_a_coeffs, distances
+        )
+        antenna_elevation_angle_b_vals = np.polyval(
+            antenna_elevation_angle_b_coeffs, distances
+        )
+
+        # 2. Test antenna elevation angle intersection
+        beam_intersection_point = (
+            calculator._calculate_antenna_elevation_angle_intersection(
+                antenna_elevation_angle_a_vals,
+                antenna_elevation_angle_b_vals,
+                distances,
+                elevations,
+            )
+        )
+
+        # Expected intersection on flat plane:
+        # 1.5x + 100 = -1.5x + 250  => 3x = 150 => x = 50
+        # y = 1.5 * 50 + 100 = 175
+        x_intersectionersect_flat = 50.0
+        y_intersectionersect_flat = 175.0
+
+        # Expected corrections
+        earth_drop_m = (x_intersectionersect_flat**2 / (2 * 6371)) * 1000  # ~196.2m
+        expected_elev_asl = y_intersectionersect_flat - earth_drop_m
+        expected_elev_terrain = expected_elev_asl - 0  # Terrain is at 0m
+
+        assert beam_intersection_point is not None
+        assert beam_intersection_point.distance_km == pytest.approx(
+            x_intersectionersect_flat
+        )
+        assert beam_intersection_point.elevation_sea_level == pytest.approx(
+            expected_elev_asl
+        )
+        assert beam_intersection_point.elevation_terrain == pytest.approx(
+            expected_elev_terrain
+        )

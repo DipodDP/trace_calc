@@ -35,7 +35,7 @@ async def main():
         site_b_coordinates=Coordinates(lat=1, lon=1),
         antenna_a_height=Meters(20),
         antenna_b_height=Meters(20),
-        elevation_angle_offset=Angle(0.5),
+        hpbw=Angle(0.5),
     )
 
     # 2. Set up services with mock dependencies

@@ -1,7 +1,10 @@
 import asyncio
 import argparse
 from environs import Env
+import os
 
+# All imports should be at the top, after standard library imports
+from trace_calc.logging_config import setup_logging
 from trace_calc.application.analysis import (
     BaseAnalysisService,
     GrozaAnalysisService,
@@ -20,11 +23,11 @@ from trace_calc.application.orchestration import OrchestrationService
 from trace_calc.application.services.profile import PathProfileService
 from trace_calc.infrastructure.output.formatters import ConsoleOutputFormatter
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
+from trace_calc.domain.exceptions import APIException
 
 
 class AppDependencies:
     """Container for application dependencies."""
-
     def __init__(self, env: Env):
         self.storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
         self.elevations_api_client = AsyncElevationsApiClient(
@@ -92,7 +95,7 @@ async def run_analysis(
         display_output=True,
         generate_plot=True,
         path=path,
-        save_plot_path=f"{OUTPUT_DATA_DIR}/{input_data.path_name}_profile.png",
+        save_plot_path=f"{OUTPUT_DATA_DIR}/{input_data.path_name}.png",
     )
     print(f"\n✅ Analysis complete! Link speed: {result.link_speed:.1f} Mbps")
 
@@ -108,8 +111,15 @@ async def main():
     )
     args = parser.parse_args()
 
+    # Load environment variables as early as possible within main()
     env = Env()
+    print(f"DEBUG: Current working directory: {os.getcwd()}")
+    print("DEBUG: Calling env.read_env('.env')")
     env.read_env(".env")
+    print(f"DEBUG: LOG_LEVEL after env.read_env(): {os.environ.get('LOG_LEVEL')}")
+
+    # Setup logging ONLY AFTER environment variables are loaded, passing env
+    setup_logging(env) # Pass the env object
 
     deps = AppDependencies(env)
     input_handler = UserInputHandler()
@@ -145,6 +155,7 @@ async def main():
         orchestrator = OrchestrationService(
             analysis_service=analysis_service,
             profile_service=profile_service,
+            declinations_api_client=deps.declinations_api_client,
             output_formatter=deps.output_formatter,
             visualizer=deps.visualizer,
         )
@@ -153,6 +164,8 @@ async def main():
 
     except (ValueError, EOFError) as e:
         print(f"Error: {e}")
+    except APIException as e:
+        print(f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the Geomagnetic Declination API.")
 
 
 if __name__ == "__main__":
