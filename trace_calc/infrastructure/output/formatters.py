@@ -227,7 +227,8 @@ class ConsoleOutputFormatter:
             print(f"  Path Distance:           {result.metadata['distance_km']:.2f} km")
 
         print("\n📉 Propagation Loss:")
-        print(f"  Basic Transmission Loss: {result.basic_transmission_loss:.2f} dB")
+        if result.basic_transmission_loss is not None:
+            print(f"  Basic Transmission Loss: {result.basic_transmission_loss:.2f} dB")
 
         if result.propagation_loss:
             print(
@@ -240,7 +241,8 @@ class ConsoleOutputFormatter:
                 f"    └─ Diffraction Loss:   {result.propagation_loss.diffraction_loss:.2f} dB"
             )
 
-        print(f"  Total Path Loss:         {result.total_path_loss:.2f} dB")
+        if result.total_path_loss is not None:
+            print(f"  Total Path Loss:         {result.total_path_loss:.2f} dB")
 
         print("\n🚀 Link Performance:")
         print(f"  Estimated Speed:         {result.link_speed:.1f} Mbps")
@@ -255,6 +257,17 @@ class ConsoleOutputFormatter:
                 else "❌ POOR"
             )
             print(f"  Link Margin:             {margin:.1f} dB ({status})")
+
+        # Universal section for model-specific outputs
+        print("\n📜 Model-Specific Outputs:")
+        if method == "SOSNIK":
+            if "extra_dist" in result.metadata:
+                print(f"  Sosnik Extra Distance:   {result.metadata['extra_dist']:.2f} km")
+            if "Lr" in result.metadata:
+                print(f"  Terrain Roughness Loss (Lr): {result.metadata['Lr']:.2f} dB")
+        elif method == "GROZA" and "dL" in result.metadata:
+            print(f"  Groza Delta to Ref:      {result.metadata['dL']:.2f} dB")
+
 
         if "profile_data" in result.metadata:
             print(format_common_volume_results(result.metadata["profile_data"]))
@@ -319,6 +332,17 @@ class JSONOutputFormatter:
                 "mag_azimuth_b_a": float(geo_data.mag_azimuth_b_a),
                 "mag_declination_a": float(geo_data.mag_declination_a),
                 "mag_declination_b": float(geo_data.mag_declination_b),
+            }
+
+        # Add model-specific outputs
+        method = output_dict.get("metadata", {}).get("method")
+        if method == "sosnik" and "extra_dist" in output_dict.get("metadata", {}):
+            output_dict["model_specific_outputs"] = {
+                "extra_dist_km": float(output_dict["metadata"]["extra_dist"])
+            }
+        elif method == "groza" and "dL" in output_dict.get("metadata", {}):
+            output_dict["model_specific_outputs"] = {
+                "delta_to_ref_db": float(output_dict["metadata"]["dL"])
             }
 
         if "profile_data" in result.metadata:

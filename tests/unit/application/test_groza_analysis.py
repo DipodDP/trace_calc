@@ -2,7 +2,7 @@
 
 import pytest
 import numpy as np
-from trace_calc.application.services.analysis import GrozaAnalysisService
+from trace_calc.application.analysis import GrozaAnalysisService
 from trace_calc.domain.models.path import PathData
 from trace_calc.domain.models.coordinates import InputData, Coordinates
 from trace_calc.domain.models.units import Meters
@@ -35,10 +35,11 @@ def sample_input_data():
     )
 
 
-def test_groza_analysis_returns_result(sample_path_data, sample_input_data):
+@pytest.mark.asyncio
+async def test_groza_analysis_returns_result(sample_path_data, sample_input_data):
     service = GrozaAnalysisService()
 
-    result = service.analyze(
+    result = await service.analyze(
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
@@ -56,10 +57,11 @@ def test_groza_analysis_returns_result(sample_path_data, sample_input_data):
     assert result.metadata["method"] == "groza"
 
 
-def test_groza_analysis_no_side_effects(sample_path_data, sample_input_data, capsys):
+@pytest.mark.asyncio
+async def test_groza_analysis_no_side_effects(sample_path_data, sample_input_data, capsys):
     service = GrozaAnalysisService()
 
-    result = service.analyze(
+    result = await service.analyze(
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
@@ -74,18 +76,19 @@ def test_groza_analysis_no_side_effects(sample_path_data, sample_input_data, cap
     assert captured.err == ""
 
 
-def test_groza_analysis_deterministic(sample_path_data, sample_input_data):
+@pytest.mark.asyncio
+async def test_groza_analysis_deterministic(sample_path_data, sample_input_data):
     """Test that analysis is deterministic (same inputs = same outputs)"""
     service1 = GrozaAnalysisService()
     service2 = GrozaAnalysisService()
 
-    result1 = service1.analyze(
+    result1 = await service1.analyze(
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
         antenna_b_height=10.0,
     )
-    result2 = service2.analyze(
+    result2 = await service2.analyze(
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,
@@ -98,11 +101,12 @@ def test_groza_analysis_deterministic(sample_path_data, sample_input_data):
     assert result1.link_speed == result2.link_speed
 
 
-def test_groza_wavelength_calculation(sample_path_data, sample_input_data):
+@pytest.mark.asyncio
+async def test_groza_wavelength_calculation(sample_path_data, sample_input_data):
     """Test wavelength calculation: λ = c / f"""
     service = GrozaAnalysisService()
 
-    result = service.analyze(
+    result = await service.analyze(
         path=sample_path_data,
         input_data=sample_input_data,
         antenna_a_height=10.0,

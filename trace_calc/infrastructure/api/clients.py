@@ -15,7 +15,8 @@ from progressbar import ProgressBar
 
 from trace_calc.domain.models.units import Angle, Degrees, Elevation
 from trace_calc.domain.models.coordinates import Coordinates
-from trace_calc.application.services.base import (
+from trace_calc.domain.interfaces import (
+    BaseApiClient,
     BaseDeclinationsApiClient,
     BaseElevationsApiClient,
 )

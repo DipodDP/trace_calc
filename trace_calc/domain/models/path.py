@@ -67,6 +67,17 @@ class GeoData:
     mag_azimuth_a_b: Angle
     mag_azimuth_b_a: Angle
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "distance_km": float(self.distance),
+            "mag_declination_a": float(self.mag_declination_a),
+            "mag_declination_b": float(self.mag_declination_b),
+            "true_azimuth_a_b": float(self.true_azimuth_a_b),
+            "true_azimuth_b_a": float(self.true_azimuth_b_a),
+            "mag_azimuth_a_b": float(self.mag_azimuth_a_b),
+            "mag_azimuth_b_a": float(self.mag_azimuth_b_a),
+        }
+
     def __repr__(self) -> str:
         return (
             f"GeoData(distance={self.distance:.2f}, "

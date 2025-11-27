@@ -21,14 +21,14 @@ from trace_calc.infrastructure.api.clients import (
 from trace_calc.infrastructure.storage import FilePathStorage
 from trace_calc.application.orchestration import OrchestrationService
 from trace_calc.application.services.profile import PathProfileService
-from trace_calc.infrastructure.output.formatters import ConsoleOutputFormatter
+from trace_calc.infrastructure.output.formatters import ConsoleOutputFormatter, JSONOutputFormatter
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
 from trace_calc.domain.exceptions import APIException
 
 
 class AppDependencies:
     """Container for application dependencies."""
-    def __init__(self, env: Env):
+    def __init__(self, env: Env, args: argparse.Namespace):
         self.storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
         self.elevations_api_client = AsyncElevationsApiClient(
             env.str("ELEVATION_API_URL"), env.str("ELEVATION_API_KEY")
@@ -36,7 +36,10 @@ class AppDependencies:
         self.declinations_api_client = AsyncMagDeclinationApiClient(
             env.str("DECLINATION_API_URL"), env.str("DECLINATION_API_KEY")
         )
-        self.output_formatter = ConsoleOutputFormatter()
+        if args.json:
+            self.output_formatter = JSONOutputFormatter()
+        else:
+            self.output_formatter = ConsoleOutputFormatter()
         self.visualizer = ProfileVisualizer(style="default")
 
 
@@ -84,20 +87,7 @@ class UserInputHandler:
         return input_data
 
 
-async def run_analysis(
-    orchestrator: OrchestrationService, input_data: InputData, path: PathData
-):
-    """Runs the analysis and prints the result."""
-    result = await orchestrator.process(
-        input_data,
-        antenna_a_height=input_data.antenna_a_height,
-        antenna_b_height=input_data.antenna_b_height,
-        display_output=True,
-        generate_plot=True,
-        path=path,
-        save_plot_path=f"{OUTPUT_DATA_DIR}/{input_data.path_name}.png",
-    )
-    print(f"\n✅ Analysis complete! Link speed: {result.link_speed:.1f} Mbps")
+
 
 
 async def main():
@@ -108,6 +98,11 @@ async def main():
         choices=["groza", "sosnik"],
         default="groza",
         help="Analysis method to use (groza or sosnik)",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results in JSON format",
     )
     args = parser.parse_args()
 
@@ -121,7 +116,7 @@ async def main():
     # Setup logging ONLY AFTER environment variables are loaded, passing env
     setup_logging(env) # Pass the env object
 
-    deps = AppDependencies(env)
+    deps = AppDependencies(env, args)
     input_handler = UserInputHandler()
 
     try:
@@ -160,7 +155,16 @@ async def main():
             visualizer=deps.visualizer,
         )
 
-        await run_analysis(orchestrator, input_data, path)
+        result = await orchestrator.process(
+            input_data,
+            antenna_a_height=input_data.antenna_a_height,
+            antenna_b_height=input_data.antenna_b_height,
+            display_output=True,
+            generate_plot=True,
+            path=path,
+            save_plot_path=f"{OUTPUT_DATA_DIR}/{input_data.path_name}.png",
+        )
+
 
     except (ValueError, EOFError) as e:
         print(f"Error: {e}")

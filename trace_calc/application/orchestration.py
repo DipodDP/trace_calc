@@ -12,7 +12,7 @@ from trace_calc.infrastructure.output.formatters import OutputFormatter
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
 from trace_calc.domain.models.path import GeoData, PathData
 from trace_calc.application.services.coordinates import CoordinatesService
-from trace_calc.application.services.base import BaseDeclinationsApiClient
+from trace_calc.domain.interfaces import BaseDeclinationsApiClient
 from trace_calc.domain.models.units import Angle, Degrees, Kilometers
 
 
@@ -97,7 +97,7 @@ class OrchestrationService:
             input_data.site_a_coordinates,
             input_data.site_b_coordinates
         )
-        result.metadata["geo_data"] = geo_data  # Add geo_data to result metadata
+        result.metadata["geo_data"] = geo_data.to_dict()  # Add geo_data to result metadata
 
         # Step 3: Display output (optional, injected dependency)
         if display_output and self.output_formatter:

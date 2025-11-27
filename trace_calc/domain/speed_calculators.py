@@ -1,7 +1,7 @@
 from typing import Tuple
 
 from trace_calc.domain.models.units import Angle, Kilometers, Loss, Speed
-from trace_calc.application.services.base import BaseSpeedCalculator
+from trace_calc.domain.interfaces import BaseSpeedCalculator
 
 
 class GrozaSpeedCalculator(BaseSpeedCalculator):

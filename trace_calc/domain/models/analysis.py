@@ -1,7 +1,7 @@
 """Domain models for propagation analysis results"""
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,12 +35,12 @@ class AnalysisResult:
     and ensure thread safety in async contexts.
     """
 
-    basic_transmission_loss: float  # dB (Groza Lb or Sosnik equivalent)
-    total_path_loss: float  # dB (includes all attenuation)
     link_speed: float  # Mbps (estimated throughput)
     wavelength: float  # meters (radio wavelength)
-    propagation_loss: PropagationLoss | None  # Detailed loss breakdown (optional)
-    metadata: dict[str, Any]  # Model-specific data (method, version, etc.)
+    basic_transmission_loss: Optional[float] = None  # dB (Groza Lb or Sosnik equivalent)
+    total_path_loss: Optional[float] = None  # dB (includes all attenuation)
+    propagation_loss: Optional[PropagationLoss] = None  # Detailed loss breakdown (optional)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
