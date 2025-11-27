@@ -1,4 +1,3 @@
-import logging
 from typing import Any
 
 import numpy as np
@@ -21,7 +20,7 @@ class PathProfileService:
         self,
         input_data: InputData,
         elevations_api_client: BaseElevationsApiClient,
-        block_size: int = 256,
+        block_size: int = 128,
         resolution: float = 0.5,
     ):
         self.elevations_api_client = elevations_api_client
@@ -48,10 +47,19 @@ class PathProfileService:
         # Extend coordinates longitude if crossing 180 degree to create linear space vector
         coord_a, coord_b = coordinates_service.get_extended_coordinates()
 
-        points_num = (
-            np.ceil(full_distance / (self.block_size * self.resolution))
-            * self.block_size
-        ).astype(int)
+        points_num = (np.ceil(full_distance / self.resolution)).astype(int)
+
+        max_points = 4 * self.block_size
+        if points_num > max_points:
+            points_num = max_points
+
+        if points_num < self.block_size:
+            points_num = self.block_size
+
+        points_num = (np.ceil(points_num / self.block_size) * self.block_size).astype(
+            int
+        )
+
         lat_vector = np.linspace(coord_a[0], coord_b[0], points_num)
         lon_vector = np.linspace(coord_a[1], coord_b[1], points_num)
 

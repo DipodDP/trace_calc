@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import re
 import xml.dom.minidom
 from collections.abc import Iterable
@@ -16,7 +15,6 @@ from progressbar import ProgressBar
 from trace_calc.domain.models.units import Angle, Degrees, Elevation
 from trace_calc.domain.models.coordinates import Coordinates
 from trace_calc.domain.interfaces import (
-    BaseApiClient,
     BaseDeclinationsApiClient,
     BaseElevationsApiClient,
 )
@@ -134,12 +132,10 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             f"fetch_elevations called with coord_vect.shape={coord_vect.shape}, block_size={block_size}"
         )
 
-        if coord_vect.shape[0] % block_size != 0:
-            raise ValueError(
-                f"Coordinate vector length must be divisible by {block_size}"
-            )
+        if coord_vect.shape[0] == 0:
+            return np.array([], dtype=np.float64)
 
-        blocks_num = coord_vect.shape[0] // block_size
+        blocks_num = (coord_vect.shape[0] + block_size - 1) // block_size
 
         logger.info(
             f"Retrieving elevation data for {coord_vect.shape[0]} coordinates in {blocks_num} blocks..."

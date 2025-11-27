@@ -193,7 +193,7 @@ async def main():
         print(f"Error: {e}")
     except APIException as e:
         print(
-            f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the Geomagnetic Declination API."
+            f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the APIs."
         )
 
 
