@@ -1,12 +1,13 @@
 # Troposcatter Trace Calculation and Advanced Link Analysis
 
 ![Example Plot](output_data/example_plot.png)
-
-Visualization of a common volume analysis, showing the terrain profile, multiple sight lines, and key intersection points.
+*Visualization of a common volume analysis, showing the terrain profile, sight lines, and key intersection points.*
 
 ## Overview
 
-This project provides tools for calculating troposcatter radio link profiles, including terrain analysis and advanced common volume calculations. It helps in designing and evaluating communication links by providing detailed insights into propagation paths, signal interference areas, and geographical data.
+This project provides an asynchronous command-line tool for calculating troposcatter radio link profiles, including terrain analysis and advanced common volume calculations. It helps in designing and evaluating communication links by providing detailed insights into propagation paths, signal interference areas, and geographical data.
+
+The application runs asynchronously, allowing for efficient I/O operations (like API calls for elevation data) without blocking the main thread.
 
 ## Prerequirements
 
@@ -19,39 +20,74 @@ You need to get an API key for using the [Elevations API on RapidAPI](https://ra
 This project features advanced Common Volume Analysis, which calculates the shared illuminated volume between two antennas, considering their half-power beamwidths (HPBW). It provides detailed metrics essential for enhanced troposcatter link design, including:
 
 *   **Multiple Sight Lines**: Generates lower and upper sight lines with configurable angular offsets.
-*   **Four Intersection Points**: Identifies:
-    *   The primary intersection of lower sight lines.
-    *   The intersection of upper sight lines.
-    *   Two "cross" intersections where the upper line from one site meets the lower line from the other (Upper A × Lower B, Upper B × Lower A).
-*   **Volumetric Data**: Computes the 3D volume of the intersection region, providing insights into the propagation environment.
-*   **Beam Intersection Point Analysis**: A dedicated analysis to identify the intersection point of two beam intersection point lines, calculating its distance, elevation above sea level (ASL), and height above terrain.
+*   **Four Intersection Points**: Identifies key intersections between sight lines.
+*   **Volumetric Data**: Computes the 3D volume of the intersection region.
+*   **Beam Intersection Point Analysis**: A dedicated analysis to identify the intersection point of two beam intersection point lines.
 
-### Enhanced Output & Geographic Data
+### Structured Output & Geographic Data
 
-Analysis outputs now include comprehensive geographic and link information:
+Analysis outputs are provided in a structured format, available as both console output and a detailed JSON file. This includes:
 
-*   **Detailed Site Coordinates**: Console and JSON outputs display precise latitude and longitude for both sites.
-*   **Geographic Metrics**: Automatically calculated path distance, azimuths, and magnetic declinations (if available).
-*   **Robust Calculations**: Underlying architectural improvements ensure accurate Earth curvature corrections for profile visualization and robust Horizon Clearance Angle (HCA) calculations.
+*   **Detailed Site Coordinates**: Precise latitude and longitude for both sites.
+*   **Geographic Metrics**: Automatically calculated path distance, azimuths, and magnetic declinations.
+*   **Model-Specific Parameters**: Detailed parameters from the propagation model used (e.g., Groza, Sosnik).
+*   **Profile Data**: Detailed information about sight lines, intersections, and common volume metrics.
 
-## Using
+## Setup
 
-Install dependencies
+Install dependencies:
 ```sh
 poetry install
 ```
-Activate virtual environment
+Activate virtual environment:
 ```sh
 poetry shell
 ```
-Run tests (verbose)
+Run tests (verbose):
 ```sh
 pytest -v -s
 ```
-Run script
+
+## Usage
+
+The main script is `trace_calc/main.py`. It can be run with several command-line arguments to control the analysis.
+
+### Command-Line Interface
+
 ```sh
-python trace_calc/main.py
+python trace_calc/main.py [--method <name>] [--save-json]
 ```
+
+**Arguments:**
+
+*   `--method <name>`: Specifies the analysis method to use.
+    *   Choices: `groza` (default), `sosnik`.
+*   `--save-json`: If provided, saves the full analysis results to a JSON file in the `output_data/` directory. The filename will be based on the path name you provide.
+
+**Interactive Prompts:**
+
+When you run the script, you will be prompted to enter:
+1.  **Stored file name**: The base name of a `.path` file (without the extension) located in the `output_data` directory. If the file exists, it will be loaded. If not, the script will fetch the elevation profile from the API and save it.
+2.  **Antenna heights**: You can specify the heights for antenna A and B, or press Enter to use the default values.
+
+**Example:**
+
+To run an analysis using the `sosnik` method and save the results to a JSON file:
+```sh
+python trace_calc/main.py --method sosnik --save-json
+```
+
+### JSON Output
+
+When using the `--save-json` flag, a detailed JSON file is generated in the `output_data/` directory. The file contains a comprehensive breakdown of the analysis, including:
+- `analysis_result`: Link speed and model-specific parameters.
+- `site_a_coordinates`, `site_b_coordinates`: Latitude and longitude for each site.
+- `geo_data`: Distance, azimuths, and magnetic declinations.
+- `profile_data`: Detailed data on sight lines, intersections, and common volume calculations.
+
+This structured output is ideal for programmatic analysis or integration with other tools.
+
 ## Configuration
 
-To configure the analysis parameters (e.g., coordinates, antenna heights, HPBW, angular offset for CVA), please adjust the `.env` file or provide arguments via the command line as supported by `main.py`.
+*   **API Keys**: Add your `ELEVATION_API_URL`, `ELEVATION_API_KEY`, `DECLINATION_API_URL`, and `DECLINATION_API_KEY` to a `.env` file in the project root.
+*   **Analysis Parameters**: Other parameters like coordinates, antenna heights, and HPBW are provided through interactive prompts or loaded from `.path` files.
