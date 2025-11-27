@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from trace_calc.domain.models.analysis import AnalyzerResult
 from trace_calc.domain.models.units import Angle, Meters
 from trace_calc.domain.models.coordinates import Coordinates, InputData
 from trace_calc.domain.models.path import HCAData, PathData
@@ -14,6 +15,7 @@ class BasePathStorage(ABC):
     """
     Abstract base class that defines the interface for loading path data.
     """
+
 
     @abstractmethod
     async def load(self, filename: str) -> PathData:
@@ -106,7 +108,7 @@ class BaseAnalyzer(BaseSpeedCalculator, ABC):
         self.input_data = input_data
 
     @abstractmethod
-    def analyze(self, /, **kwargs: Any) -> dict[str, Any]:
+    def analyze(self, /, **kwargs: Any) -> AnalyzerResult:
         """
         Perform analysis using speed and HCA calculators,
         and return the results as a dictionary.

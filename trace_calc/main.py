@@ -3,7 +3,6 @@ import argparse
 from environs import Env
 import os
 
-# All imports should be at the top, after standard library imports
 from trace_calc.logging_config import setup_logging
 from trace_calc.application.analysis import (
     BaseAnalysisService,
@@ -21,13 +20,17 @@ from trace_calc.infrastructure.api.clients import (
 from trace_calc.infrastructure.storage import FilePathStorage
 from trace_calc.application.orchestration import OrchestrationService
 from trace_calc.application.services.profile import PathProfileService
-from trace_calc.infrastructure.output.formatters import ConsoleOutputFormatter, JSONOutputFormatter
+from trace_calc.infrastructure.output.formatters import (
+    ConsoleOutputFormatter,
+    JSONOutputFormatter,
+)
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
 from trace_calc.domain.exceptions import APIException
 
 
 class AppDependencies:
     """Container for application dependencies."""
+
     def __init__(self, env: Env, args: argparse.Namespace):
         self.storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
         self.elevations_api_client = AsyncElevationsApiClient(
@@ -36,10 +39,7 @@ class AppDependencies:
         self.declinations_api_client = AsyncMagDeclinationApiClient(
             env.str("DECLINATION_API_URL"), env.str("DECLINATION_API_KEY")
         )
-        if args.json:
-            self.output_formatter = JSONOutputFormatter()
-        else:
-            self.output_formatter = ConsoleOutputFormatter()
+        self.output_formatter = ConsoleOutputFormatter()
         self.visualizer = ProfileVisualizer(style="default")
 
 
@@ -87,7 +87,43 @@ class UserInputHandler:
         return input_data
 
 
+async def run_analysis(
+    orchestrator: OrchestrationService,
+    input_data: InputData,
+    path: PathData,
+    args: argparse.Namespace,
+    deps: AppDependencies,
+):
+    """Runs the analysis and handles output formatting."""
+    result = await orchestrator.process(
+        input_data,
+        antenna_a_height=input_data.antenna_a_height,
+        antenna_b_height=input_data.antenna_b_height,
+        display_output=False,  # We handle output here
+        generate_plot=True,
+        path=path,
+        save_plot_path=f"{OUTPUT_DATA_DIR}/{input_data.path_name}.png",
+    )
 
+    geo_data = result.result.get("geo_data")
+    profile_data = result.result.get("profile_data")
+
+    speed_prefix = result.result.get("speed_prefix", "M")
+    speed_unit = "Mbps" if speed_prefix == "M" else "kbps"
+
+    if args.save_json:
+        formatter = JSONOutputFormatter()
+        json_output = formatter.format_result(
+            result, input_data, geo_data, profile_data
+        )
+        file_path = os.path.join(OUTPUT_DATA_DIR, f"{input_data.path_name}.json")
+        with open(file_path, "w") as f:
+            f.write(json_output)
+        print(f"✅ JSON output saved to {file_path}")
+        print(f"   Link speed: {result.link_speed:.1f} {speed_unit}")
+    else:
+        deps.output_formatter.format_result(result, input_data, geo_data, profile_data)
+        print(f"✅ Analysis complete! Link speed: {result.link_speed:.1f} {speed_unit}")
 
 
 async def main():
@@ -100,21 +136,18 @@ async def main():
         help="Analysis method to use (groza or sosnik)",
     )
     parser.add_argument(
-        "--json",
+        "--save-json",
         action="store_true",
-        help="Output results in JSON format",
+        help="Save JSON output to a file in the output_data directory",
     )
     args = parser.parse_args()
 
     # Load environment variables as early as possible within main()
     env = Env()
-    print(f"DEBUG: Current working directory: {os.getcwd()}")
-    print("DEBUG: Calling env.read_env('.env')")
     env.read_env(".env")
-    print(f"DEBUG: LOG_LEVEL after env.read_env(): {os.environ.get('LOG_LEVEL')}")
 
     # Setup logging ONLY AFTER environment variables are loaded, passing env
-    setup_logging(env) # Pass the env object
+    setup_logging(env)  # Pass the env object
 
     deps = AppDependencies(env, args)
     input_handler = UserInputHandler()
@@ -151,25 +184,17 @@ async def main():
             analysis_service=analysis_service,
             profile_service=profile_service,
             declinations_api_client=deps.declinations_api_client,
-            output_formatter=deps.output_formatter,
             visualizer=deps.visualizer,
         )
 
-        result = await orchestrator.process(
-            input_data,
-            antenna_a_height=input_data.antenna_a_height,
-            antenna_b_height=input_data.antenna_b_height,
-            display_output=True,
-            generate_plot=True,
-            path=path,
-            save_plot_path=f"{OUTPUT_DATA_DIR}/{input_data.path_name}.png",
-        )
-
+        await run_analysis(orchestrator, input_data, path, args, deps)
 
     except (ValueError, EOFError) as e:
         print(f"Error: {e}")
     except APIException as e:
-        print(f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the Geomagnetic Declination API.")
+        print(
+            f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the Geomagnetic Declination API."
+        )
 
 
 if __name__ == "__main__":

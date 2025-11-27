@@ -282,10 +282,10 @@ class ProfileVisualizer:
             f"Height: {height_between_intersections / 1000:.2f} km"
         )
         if result:
-            hca_b1_max = result.metadata.get("b1_max", 0.0)
-            hca_b2_max = result.metadata.get("b2_max", 0.0)
-            hca_b_sum = result.metadata.get("b_sum", 0.0)
-            hpbw_value = result.metadata.get("hpbw", 0.0)
+            hca_b1_max = result.result.get("b1_max", 0.0)
+            hca_b2_max = result.result.get("b2_max", 0.0)
+            hca_b_sum = result.result.get("b_sum", 0.0)
+            hpbw_value = result.result.get("hpbw", 0.0)
 
             # HCA is Horizon Close Angle, BIA is Beam Intersection Angle, Θ is Beamwidgth (HPBW)"
             metrics_text += (

@@ -43,7 +43,8 @@ def mock_dependencies():
 
         # Mock OrchestrationService.process to be an AsyncMock
         mock_analysis_result = MagicMock()
-        mock_analysis_result.link_speed = 100.0 # Provide a numeric value for link_speed
+        mock_analysis_result.link_speed = 100.0  # Top-level attribute
+        mock_analysis_result.result = {"speed_prefix": "M", "wavelength": 0.3}
         mock_orchestration_service_instance = MockOrchestrationService.return_value
         mock_orchestration_service_instance.process = AsyncMock(return_value=mock_analysis_result)
 
@@ -79,20 +80,18 @@ async def test_main_instantiates_orchestration_service_correctly(mock_dependenci
         call_args = MockOrchestrationService.call_args[1] # Keyword arguments
 
         # Assert correct service types are passed
-        assert isinstance(call_args["analysis_service"], MagicMock) # GrozaAnalysisService mock
-        assert isinstance(call_args["profile_service"], MagicMock) # PathProfileService mock
-        assert isinstance(call_args["declinations_api_client"], MagicMock) # AsyncMagDeclinationApiClient mock
-        assert isinstance(call_args["output_formatter"], MagicMock) # ConsoleOutputFormatter mock
-        assert isinstance(call_args["visualizer"], MagicMock) # ProfileVisualizer mock
+        assert isinstance(call_args["analysis_service"], MagicMock)  # GrozaAnalysisService mock
+        assert isinstance(call_args["profile_service"], MagicMock)  # PathProfileService mock
+        assert isinstance(call_args["declinations_api_client"], MagicMock)  # AsyncMagDeclinationApiClient mock
+        assert isinstance(call_args["visualizer"], MagicMock)  # ProfileVisualizer mock
 
         # Assert specific mocks are used
         mock_dependencies["MockGrozaAnalysisService"].assert_called_once()
-        mock_dependencies["MockProfileService"].assert_called_once() # Check this one
+        mock_dependencies["MockProfileService"].assert_called_once()
         mock_dependencies["MockElevationsApiClient"].assert_called_once_with(
             "mock_ELEVATION_API_URL", "mock_ELEVATION_API_KEY"
         )
         mock_dependencies["MockMagDeclinationApiClient"].assert_called_once_with(
             "mock_DECLINATION_API_URL", "mock_DECLINATION_API_KEY"
         )
-        mock_dependencies["MockOutputFormatter"].assert_called_once()
         mock_dependencies["MockVisualizer"].assert_called_once()

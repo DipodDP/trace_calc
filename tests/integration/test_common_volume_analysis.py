@@ -15,6 +15,7 @@ from trace_calc.infrastructure.output.formatters import (
     ConsoleOutputFormatter,
     JSONOutputFormatter,
 )
+from trace_calc.domain.models.analysis import AnalysisResult
 from trace_calc.domain.models.path import (
     PathData,
     ProfileData,
@@ -128,22 +129,25 @@ class TestCommonVolumeAnalysis:
         Verify all sections are present.
         """
         formatter = ConsoleOutputFormatter()
-        # Mock AnalysisResult to contain profile_data in metadata
-        mock_result = MagicMock()
-        mock_result.metadata = {"profile_data": mock_profile_data, "method": "test"}
-        mock_result.wavelength = 0.3  # dummy
-        mock_result.basic_transmission_loss = 100  # dummy
-        mock_result.total_path_loss = 120  # dummy
-        mock_result.link_speed = 50  # dummy
-        mock_result.propagation_loss = MagicMock(
-            free_space_loss=10.0,
-            atmospheric_loss=5.0,
-            diffraction_loss=2.0,
-            total_loss=17.0,
+        analysis_result = AnalysisResult(
+            link_speed=50,
+            wavelength=0.3,
+            model_propagation_loss_parameters={
+                "basic_transmission_loss": 100,
+                "total_path_loss": 120,
+                "propagation_loss": {
+                    "free_space_loss": 10.0,
+                    "atmospheric_loss": 5.0,
+                    "diffraction_loss": 2.0,
+                    "refraction_loss": 0.0,
+                    "total_loss": 17.0,
+                },
+            },
+            result={"profile_data": mock_profile_data, "method": "test"},
         )
 
         with patch("builtins.print") as mock_print:
-            formatter.format_result(mock_result, mock_input_data)
+            formatter.format_result(analysis_result, mock_input_data, None, mock_profile_data)
             printed_output = "".join(call.args[0] for call in mock_print.call_args_list)
 
             assert "Common Scatter Volume Analysis" in printed_output
@@ -170,20 +174,23 @@ class TestCommonVolumeAnalysis:
         formatter = JSONOutputFormatter()
         # Create a real AnalysisResult object
         analysis_result = AnalysisResult(
-            basic_transmission_loss=100,
-            total_path_loss=120,
             link_speed=50,
             wavelength=0.3,
-            propagation_loss=PropagationLoss(
-                free_space_loss=10.0,
-                atmospheric_loss=5.0,
-                diffraction_loss=2.0,
-                total_loss=17.0,
-            ),
-            metadata={"profile_data": mock_profile_data, "method": "test"},
+            model_propagation_loss_parameters={
+                "basic_transmission_loss": 100,
+                "total_path_loss": 120,
+                "propagation_loss": {
+                    "free_space_loss": 10.0,
+                    "atmospheric_loss": 5.0,
+                    "diffraction_loss": 2.0,
+                    "refraction_loss": 0.0,
+                    "total_loss": 17.0,
+                },
+            },
+            result={"profile_data": mock_profile_data, "method": "test"},
         )
 
-        json_output = formatter.format_result(analysis_result, mock_input_data)
+        json_output = formatter.format_result(analysis_result, mock_input_data, None, mock_profile_data)
         output_dict = json.loads(json_output)
 
         assert "profile_data" in output_dict
@@ -201,38 +208,27 @@ class TestCommonVolumeAnalysis:
         assert "cross_ab" in profile_json["intersections"]
         assert "cross_ba" in profile_json["intersections"]
 
-        assert "volume" in profile_json
-        assert "cone_intersection_volume_m3" in profile_json["volume"]
-        assert "distance_a_to_cross_ab" in profile_json["volume"]
+        assert "common_volume" in profile_json
+        assert "cone_intersection_volume_m3" in profile_json["common_volume"]
+        assert "distance_a_to_cross_ab" in profile_json["common_volume"]
 
         # Verify new distance metrics are present in JSON
-        assert "distance_a_to_lower_intersection" in profile_json["volume"]
-        assert "distance_b_to_lower_intersection" in profile_json["volume"]
-        assert "distance_a_to_upper_intersection" in profile_json["volume"]
-        assert "distance_b_to_upper_intersection" in profile_json["volume"]
-        assert "distance_between_lower_upper_intersections" in profile_json["volume"]
+        assert "distance_a_to_lower_intersection" in profile_json["common_volume"]
+        assert "distance_b_to_lower_intersection" in profile_json["common_volume"]
+        assert "distance_a_to_upper_intersection" in profile_json["common_volume"]
+        assert "distance_b_to_upper_intersection" in profile_json["common_volume"]
+        assert "distance_between_lower_upper_intersections" in profile_json["common_volume"]
 
         # Verify round-trip (serialize/deserialize)
-        assert np.isclose(
-            profile_json["volume"]["cone_intersection_volume_m3"],
-            mock_profile_data.volume.cone_intersection_volume_m3,
-        )
-        assert np.isclose(
-            profile_json["intersections"]["lower"]["distance_km"],
-            mock_profile_data.intersections.lower.distance_km,
-        )
+        # Compare formatted values to avoid precision issues with np.isclose
+        assert profile_json["common_volume"]["cone_intersection_volume_m3"] == float(f"{mock_profile_data.volume.cone_intersection_volume_m3:.2f}")
+        assert profile_json["intersections"]["lower"]["distance_km"] == float(f"{mock_profile_data.intersections.lower.distance_km:.2f}")
         assert np.isclose(
             profile_json["sight_lines"]["lower_a_slope"],
-            mock_profile_data.lines_of_sight.lower_a[0],
+            mock_profile_data.lines_of_sight.lower_a[0], # Keep as is, not formatted to .2f in output
         )
-        assert np.isclose(
-            profile_json["volume"]["distance_a_to_lower_intersection"],
-            mock_profile_data.volume.distance_a_to_lower_intersection,
-        )
-        assert np.isclose(
-            profile_json["volume"]["distance_between_lower_upper_intersections"],
-            mock_profile_data.volume.distance_between_lower_upper_intersections,
-        )
+        assert profile_json["common_volume"]["distance_a_to_lower_intersection"] == float(f"{mock_profile_data.volume.distance_a_to_lower_intersection:.2f}")
+        assert profile_json["common_volume"]["distance_between_lower_upper_intersections"] == float(f"{mock_profile_data.volume.distance_between_lower_upper_intersections:.2f}")
 
     def test_different_angle_offsets(self, mock_path_data, mock_input_data):
         """
@@ -340,21 +336,23 @@ class TestCommonVolumeAnalysis:
 
         # Run the analyzer to get the real result and profile_data
         analyzer = GrozaAnalyzer(mock_path_data, mock_input_data)
-        result_data = analyzer.analyze()
-        profile_data = analyzer.profile_data
+        analyzer_result = analyzer.analyze()
+        profile_data = analyzer_result.profile_data
 
         # Create a full AnalysisResult object
         from trace_calc.domain.models.analysis import AnalysisResult
 
         result = AnalysisResult(
-            basic_transmission_loss=result_data["Ltot"],
-            total_path_loss=result_data["Ltot"],
-            link_speed=result_data["speed"],
-            wavelength=0.3,
-            propagation_loss=None,
-            metadata=result_data,
+            link_speed=analyzer_result.link_speed,
+            wavelength=analyzer_result.wavelength,
+            model_propagation_loss_parameters=analyzer_result.model_parameters,
+            result={
+                "b1_max": analyzer_result.hca.b1_max,
+                "b2_max": analyzer_result.hca.b2_max,
+                "b_sum": analyzer_result.hca.b_sum,
+            },
         )
-        result.metadata["hpbw"] = mock_input_data.hpbw
+        result.result["hpbw"] = mock_input_data.hpbw
         # Set the angle attribute on the actual object if it exists.
         # Check if beam_intersection_point is not None first.
         if profile_data.intersections.beam_intersection_point:

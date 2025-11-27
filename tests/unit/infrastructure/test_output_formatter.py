@@ -19,6 +19,7 @@ from trace_calc.domain.models.units import Angle
 from trace_calc.domain.models.coordinates import InputData, Coordinates
 from trace_calc.domain.models.path import GeoData
 
+
 @pytest.fixture
 def sample_geo_data():
     """Create sample geo data for testing"""
@@ -32,6 +33,7 @@ def sample_geo_data():
         mag_azimuth_b_a=Angle(273.0),
     )
 
+
 @pytest.fixture
 def sample_input_data():
     """Create sample input data for testing"""
@@ -40,6 +42,7 @@ def sample_input_data():
         site_a_coordinates=Coordinates(lat=50.0, lon=14.0),
         site_b_coordinates=Coordinates(lat=50.1, lon=14.1),
         frequency_mhz=1000.0,
+        hpbw=Angle(2.5),
     )
 
 
@@ -109,27 +112,33 @@ def sample_analysis_result(sample_input_data, sample_geo_data):
     )
 
     return AnalysisResult(
-        basic_transmission_loss=120.5,
-        total_path_loss=145.2,
         link_speed=87.3,
         wavelength=0.3,
-        propagation_loss=PropagationLoss(
-            free_space_loss=92.4,
-            atmospheric_loss=0.5,
-            diffraction_loss=12.3,
-            total_loss=105.2,
-        ),
-        metadata={
+        model_propagation_loss_parameters={
+            "basic_transmission_loss": 120.5,
+            "total_loss": 145.2,
+            "propagation_loss": PropagationLoss(
+                free_space_loss=132.4,
+                atmospheric_loss=0.5,
+                diffraction_loss=12.3,
+                refraction_loss=0.0,
+                total_loss=145.2,
+            ),
+        },
+        result={
             "method": "groza",
             "distance_km": 100.5,
             "frequency_mhz": 1000.0,
+            "hpbw": sample_input_data.hpbw,
             "profile_data": dummy_profile_data,
-            "geo_data": sample_geo_data,  # Add geo_data to metadata
+            "geo_data": sample_geo_data,  # Add geo_data to result
         },
     )
 
 
-def test_console_formatter_prints_summary(sample_analysis_result, sample_input_data, sample_geo_data):
+def test_console_formatter_prints_summary(
+    sample_analysis_result, sample_input_data, sample_geo_data
+):
     """Test that formatter prints readable summary with geo data"""
     formatter = ConsoleOutputFormatter()
 
@@ -137,16 +146,26 @@ def test_console_formatter_prints_summary(sample_analysis_result, sample_input_d
     captured_output = StringIO()
     sys.stdout = captured_output
 
-    formatter.format_result(sample_analysis_result, input_data=sample_input_data, geo_data=sample_geo_data)
+    profile_data = sample_analysis_result.result.get("profile_data")
+    formatter.format_result(
+        sample_analysis_result,
+        input_data=sample_input_data,
+        geo_data=sample_geo_data,
+        profile_data=profile_data,
+    )
 
     sys.stdout = sys.__stdout__
     output = captured_output.getvalue()
 
     # Verify key information is printed
     assert "GROZA Analysis Result" in output
-    assert "120.5" in output  # Basic loss
-    assert "145.2" in output  # Total loss
-    assert "87.3" in output  # Link speed
+    assert "Total Path Loss (Ltot):  145.20 dB" in output  # Total loss
+    assert "Estimated Speed:         87.3 Mbps" in output  # Link speed
+
+    # Verify link parameters are printed and formatted
+    assert "Wavelength:              0.30 m" in output
+    assert "Frequency:               1000.00 MHz" in output
+    assert "HPBW:                    2.50°" in output  # From sample_input_data
 
     # Verify site coordinates are printed
     assert "Site Coordinates:" in output
@@ -155,7 +174,7 @@ def test_console_formatter_prints_summary(sample_analysis_result, sample_input_d
 
     # Verify geo data is printed
     assert "Geographic Data:" in output
-    assert "Distance:                100.00 km" in output # From sample_geo_data
+    assert "Distance:                100.00 km" in output  # From sample_geo_data
 
     # Verify geo data is printed
     assert "Geographic Data:" in output
@@ -172,7 +191,7 @@ def test_console_formatter_prints_summary(sample_analysis_result, sample_input_d
     assert "Distance: 90.00 km" in output
     assert "Elevation ASL: 0.15 km" in output
     assert "Elevation above terrain: 0.05 km" in output
-    assert "Angle: 12.34°" in output
+    assert "Intersection angle: 12.34°" in output
     assert "Antenna Elevation Angles:" in output
     assert "Antenna Elevation Angle A: 1.23°" in output
     assert "Antenna Elevation Angle B: -4.56°" in output
@@ -183,7 +202,9 @@ def test_console_formatter_prints_summary(sample_analysis_result, sample_input_d
     assert "Upper B x Lower A: 80.00 km" in output
     assert "0.14 km ASL" in output  # cross_ba.elevation_sea_level / 1000
     assert "0.04 km above terrain" in output  # cross_ba.elevation_terrain / 1000
-    assert "Common scatter volume: 1.00 km³" in output  # volume.cone_intersection_volume_m3 / 1e9
+    assert (
+        "Common scatter volume: 1.00 km³" in output
+    )  # volume.cone_intersection_volume_m3 / 1e9
     assert "Common volume bottom (lower intersection): 50.00 km" in output
     assert "0.01 km above terrain" in output
     assert "0.10 km ASL" in output
@@ -192,15 +213,22 @@ def test_console_formatter_prints_summary(sample_analysis_result, sample_input_d
     assert "0.12 km ASL" in output
 
 
-def test_console_formatter_handles_missing_loss_breakdown(sample_analysis_result, sample_input_data):
+def test_console_formatter_handles_missing_loss_breakdown(
+    sample_analysis_result, sample_input_data
+):
     """Test formatter handles missing propagation_loss gracefully"""
     result_without_loss = AnalysisResult(
-        basic_transmission_loss=120.5,
-        total_path_loss=145.2,
         link_speed=87.3,
         wavelength=0.3,
-        propagation_loss=None,  # Missing!
-        metadata={"method": "groza", "geo_data": sample_analysis_result.metadata["geo_data"]},
+        model_propagation_loss_parameters={
+            "basic_transmission_loss": 120.5,
+            "total_loss": 145.2,
+            "propagation_loss": None,  # Missing!
+        },
+        result={
+            "method": "groza",
+            "geo_data": sample_analysis_result.result["geo_data"],
+        },
     )
 
     formatter = ConsoleOutputFormatter()
@@ -208,8 +236,12 @@ def test_console_formatter_handles_missing_loss_breakdown(sample_analysis_result
     # Should not raise exception
     captured_output = StringIO()
     sys.stdout = captured_output
-    formatter.format_result(result_without_loss, input_data=sample_input_data, geo_data=sample_analysis_result.metadata["geo_data"])
+    formatter.format_result(
+        result_without_loss,
+        input_data=sample_input_data,
+        geo_data=sample_analysis_result.result["geo_data"],
+    )
     sys.stdout = sys.__stdout__
 
     output = captured_output.getvalue()
-    assert "120.5" in output  # Still prints basic info
+    assert "Total Path Loss (Ltot):  145.20 dB" in output  # Still prints total loss

@@ -1,13 +1,10 @@
-from abc import ABC, abstractmethod
 import os
-from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from trace_calc.domain.models.units import Meters
 from trace_calc.domain.models.coordinates import InputData
-from trace_calc.domain.models.path import HCAData, PathData, ProfileData
+from trace_calc.domain.models.path import PathData, ProfileData
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
 from trace_calc.domain.constants import OUTPUT_DATA_DIR
 from trace_calc.application.services.profile_data_calculator import (

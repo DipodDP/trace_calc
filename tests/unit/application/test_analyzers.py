@@ -8,17 +8,17 @@ def test_sosnic_analyzer():
         test_profile, InputData("test_file", frequency_mhz=1000.0)
     )
     result = analyzer.analyze()
-    assert f"{result.get('b_sum'):.3f}" == "0.552"
-    assert result.get("speed") == 64
-    assert result.get("speed_prefix") == "k"
+    assert f"{result.hca.b_sum:.3f}" == "0.552"
+    assert result.link_speed == 64
+    assert result.speed_prefix == "k" == "k"
 
 
 def test_groza_analyzer():
     analyzer = GrozaAnalyzer(test_profile, InputData("test_file", frequency_mhz=1000.0))
     result = analyzer.analyze()
-    assert f"{result.get('b_sum'):.3f}" == "0.552"
-    assert result.get("speed") == 22.3
-    assert result.get("speed_prefix") == "M"
+    assert f"{result.hca.b_sum:.3f}" == "0.552"
+    assert result.link_speed == 44.6
+    assert result.speed_prefix == "M"
 
 
 def test_profile_calculator_independent_from_hca():

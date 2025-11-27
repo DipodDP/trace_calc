@@ -67,4 +67,4 @@ venv.bak/
 *.trlc
 *.path
 *.png
-like.cnt
+*.json

@@ -6,9 +6,9 @@ from trace_calc.domain.interfaces import BaseSpeedCalculator
 
 class GrozaSpeedCalculator(BaseSpeedCalculator):
     def calculate_speed(
-        self, L0: Loss, Lmed: Loss, Lr: Loss, Lk: Loss, ld: float
+        self, L0: Loss, Lmed: Loss, Lr: Loss, Lk: Loss, Ld: float
     ) -> Tuple[Loss, Loss, Speed]:
-        L: Loss = Loss(L0 + Lmed + Lr + Lk + ld)
+        L: Loss = Loss(L0 + Lmed + Lr + Lk + Ld)
         dL: Loss = Loss(L - 233.8)
         if dL > -1.66:
             speed: Speed = Speed(15.2 * 10 ** (-dL / 10))
@@ -21,14 +21,14 @@ class GrozaSpeedCalculator(BaseSpeedCalculator):
 
 class SosnikSpeedCalculator(BaseSpeedCalculator):
     def calculate_speed(
-        self, trace_dist: Kilometers, Lr: Loss, b_sum: Angle
-    ) -> Tuple[Speed, Kilometers]:
+        self, trace_dist: Kilometers, L_correction: Loss, b_sum: Angle
+    ) -> Tuple[Speed, Kilometers, Kilometers]:
         extra_dist: Kilometers = Kilometers(148 * b_sum) if b_sum > 0 else Kilometers(0)
         equal_dist: Kilometers = Kilometers(trace_dist + extra_dist)
 
-        if trace_dist < 40 and equal_dist < 90 and Lr >= -35:
+        if trace_dist < 40 and equal_dist < 90 and L_correction >= -35:
             speed: Speed = Speed(2048)
-        elif Lr < -45:
+        elif L_correction < -45:
             speed = Speed(0)
         elif equal_dist < 120:
             speed = Speed(512)
@@ -39,4 +39,4 @@ class SosnikSpeedCalculator(BaseSpeedCalculator):
         else:
             speed = Speed(0)
 
-        return speed, extra_dist
+        return speed, extra_dist, equal_dist

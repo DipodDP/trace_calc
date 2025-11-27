@@ -9,6 +9,7 @@ from trace_calc.domain.models.units import (
     Speed,
     Degrees,
 )
+from trace_calc.domain.models.analysis import AnalyzerResult
 from trace_calc.domain.models.coordinates import InputData
 from trace_calc.domain.models.path import PathData
 from trace_calc.application.analyzers.base import BaseServiceAnalyzer
@@ -93,36 +94,45 @@ class GrozaAnalyzer(
             )
         )
 
-    def analyze(self, *, Lk: Loss = Loss(0.0), **kwargs: Any) -> dict[str, Any]:
+    def analyze(self, *, Lk: Loss = Loss(0.0), **kwargs: Any) -> AnalyzerResult:
         trace_dist = self.distances[-1]
 
+        c = 299792458
+        frequency_hz = self.input_data.frequency_mhz * 1e6
+        wavelength_m = c / frequency_hz
+
         # calc losses
-        L0 = self._l0_calc(trace_dist, Meters(0.06))
-        Lmed = self._lmed_calc(trace_dist, Meters(0.06))
+        Ld = 2
+        L0 = self._l0_calc(trace_dist, Meters(wavelength_m))
+        Lmed = self._lmed_calc(trace_dist, Meters(wavelength_m))
         Lr = self._lr_calc(trace_dist, self._delta_calc())
 
-        Ltot, dL, speed = self.calculate_speed(L0, Lmed, Lr, Lk, 2)
+        Ltot, dL, speed = self.calculate_speed(L0, Lmed, Lr, Lk, Ld)
 
         logger.debug(f"Total losses = {Ltot:.1f} dB")
         logger.debug(f"Delta to reference trace = {dL:.1f} dB")
         speed_prefix = "M"
         if speed < 1:
-            speed = Speed(speed * 1024)
+            speed_val = Speed(speed * 1024)
             speed_prefix = "k"
+        else:
+            speed_val = speed
 
-        data = {
-            "method": "groza",
+        model_parameters = {
             "L0": L0,
             "Lmed": Lmed,
+            "Ld": Ld,
             "Lr": Lr,
-            "trace_dist": trace_dist,
-            "b1_max": self.hca_data.b1_max,
-            "b2_max": self.hca_data.b2_max,
-            "b_sum": self.hca_data.b_sum,
             "Ltot": Ltot,
             "dL": dL,
-            "speed": speed,
-            "speed_prefix": speed_prefix,
+            "method": "groza",
         }
 
-        return data
+        return AnalyzerResult(
+            model_parameters=model_parameters,
+            link_speed=speed_val,
+            wavelength=wavelength_m,
+            hca=self.hca_data,
+            profile_data=self.profile_data,
+            speed_prefix=speed_prefix,
+        )

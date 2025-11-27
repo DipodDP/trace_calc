@@ -4,7 +4,7 @@ version = "0.3.22"
 description = ""
 authors = ["DipodDP <dipoddp@gmail.com>"]
 readme = "README.md"
-# packages = [{include = "trace_calc"}]
+packages = [{include = "trace_calc"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -31,6 +31,8 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
+testpaths = ["tests", "trace_calc"]
 filterwarnings = [
     "ignore:The '__version_info__' attribute is deprecated:DeprecationWarning",
+    "ignore:FigureCanvasAgg is non-interactive, and thus cannot be shown:UserWarning",
 ]

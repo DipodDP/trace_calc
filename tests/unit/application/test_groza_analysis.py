@@ -12,10 +12,13 @@ from trace_calc.domain.models.analysis import AnalysisResult
 @pytest.fixture
 def sample_path_data():
     """Create sample path data for testing"""
+    distances = np.linspace(0, 100, 101)
+    # Create a simple concave (valley) profile
+    elevations = 300 + ((distances - 50) ** 2) / 25
     return PathData(
         coordinates=np.array([[50.0, 14.0], [50.1, 14.1]]),
-        distances=np.linspace(0, 100, 101),  # 100 km, 101 points
-        elevations=np.random.uniform(200, 500, 101),  # Random elevations
+        distances=distances,
+        elevations=elevations,
     )
 
 
@@ -50,11 +53,11 @@ async def test_groza_analysis_returns_result(sample_path_data, sample_input_data
     assert isinstance(result, AnalysisResult)
 
     # Verify all fields are populated
-    assert result.basic_transmission_loss > 0
-    assert result.total_path_loss > 0
+    assert result.model_propagation_loss_parameters["propagation_loss"].total_loss > 0
+    assert result.model_propagation_loss_parameters["total_loss"] > 0
     assert result.link_speed > 0
     assert result.wavelength > 0
-    assert result.metadata["method"] == "groza"
+    assert result.result["method"] == "groza"
 
 
 @pytest.mark.asyncio
@@ -96,10 +99,9 @@ async def test_groza_analysis_deterministic(sample_path_data, sample_input_data)
     )
 
     # Results should be identical
-    assert result1.basic_transmission_loss == result2.basic_transmission_loss
-    assert result1.total_path_loss == result2.total_path_loss
+    assert result1.model_propagation_loss_parameters["propagation_loss"].total_loss == result2.model_propagation_loss_parameters["propagation_loss"].total_loss
+    assert result1.model_propagation_loss_parameters["total_loss"] == result2.model_propagation_loss_parameters["total_loss"]
     assert result1.link_speed == result2.link_speed
-
 
 @pytest.mark.asyncio
 async def test_groza_wavelength_calculation(sample_path_data, sample_input_data):

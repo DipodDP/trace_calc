@@ -7,30 +7,34 @@ from trace_calc.domain.models.analysis import AnalysisResult, PropagationLoss
 def test_analysis_result_creation():
     """Test creating analysis result with valid data"""
     result = AnalysisResult(
-        basic_transmission_loss=120.5,
-        total_path_loss=145.2,
         link_speed=100.0,
         wavelength=0.03,
-        propagation_loss=None,
-        metadata={"model": "groza", "version": "1.0"},
+        model_propagation_loss_parameters={
+            "basic_transmission_loss": 120.5,
+            "total_path_loss": 145.2,
+            "propagation_loss": None,
+        },
+        result={"model": "groza", "version": "1.0"},
     )
 
-    assert result.basic_transmission_loss == 120.5
-    assert result.total_path_loss == 145.2
+    assert result.model_propagation_loss_parameters["basic_transmission_loss"] == 120.5
+    assert result.model_propagation_loss_parameters["total_path_loss"] == 145.2
     assert result.link_speed == 100.0
     assert result.wavelength == 0.03
-    assert result.metadata["model"] == "groza"
+    assert result.result["model"] == "groza"
 
 
 def test_analysis_result_immutable():
     """Test that AnalysisResult is immutable (frozen dataclass)"""
     result = AnalysisResult(
-        basic_transmission_loss=120.5,
-        total_path_loss=145.2,
         link_speed=100.0,
         wavelength=0.03,
-        propagation_loss=None,
-        metadata={},
+        model_propagation_loss_parameters={
+            "basic_transmission_loss": 120.5,
+            "total_path_loss": 145.2,
+            "propagation_loss": None,
+        },
+        result={},
     )
 
     with pytest.raises(AttributeError):
@@ -43,12 +47,13 @@ def test_propagation_loss_validation():
         free_space_loss=92.4,
         atmospheric_loss=0.5,
         diffraction_loss=12.3,
+        refraction_loss=0.0,
         total_loss=105.2,
     )
 
     assert loss.free_space_loss == 92.4
     # Validate total matches sum
-    expected_total = 92.4 + 0.5 + 12.3
+    expected_total = 92.4 + 0.5 + 12.3 + 0.0
     assert abs(loss.total_loss - expected_total) < 0.1
 
 

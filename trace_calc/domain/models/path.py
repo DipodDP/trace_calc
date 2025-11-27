@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, NamedTuple, Optional
 
 import numpy as np
@@ -7,8 +7,33 @@ from numpy.typing import NDArray
 from .units import Angle, Kilometers
 
 
+class BaseModel:
+    def to_dict(self):
+        """Converts a dataclass instance to a dictionary, handling nested dataclasses,
+        NamedTuples, and numpy arrays.
+        """
+        result = {}
+        for f in fields(self):
+            value = self._convert_value(getattr(self, f.name))
+            result[f.name] = value
+        return result
+
+    def _convert_value(self, value: Any) -> Any:
+        if hasattr(value, 'to_dict'):
+            return value.to_dict()
+        if type(value).__name__ in ('Angle', 'Kilometers'):
+            return float(value)
+        if isinstance(value, tuple) and hasattr(value, '_asdict'):  # Handle NamedTuple
+            return {k: self._convert_value(v) for k, v in value._asdict().items()}
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        if isinstance(value, (list, tuple)):
+            return [self._convert_value(v) for v in value]
+        return value
+
+
 @dataclass(slots=True)
-class IntersectionPoint:
+class IntersectionPoint(BaseModel):
     """Represents a point where two sight lines intersect."""
     distance_km: float
     elevation_sea_level: float
@@ -17,7 +42,7 @@ class IntersectionPoint:
 
 
 @dataclass(slots=True)
-class SightLinesData:
+class SightLinesData(BaseModel):
     """Container for all four sight line equations."""
     lower_a: NDArray[np.float64]
     lower_b: NDArray[np.float64]
@@ -28,7 +53,7 @@ class SightLinesData:
 
 
 @dataclass(slots=True)
-class IntersectionsData:
+class IntersectionsData(BaseModel):
     """All intersection points between sight lines."""
     lower: IntersectionPoint
     upper: IntersectionPoint
@@ -38,7 +63,7 @@ class IntersectionsData:
 
 
 @dataclass(slots=True)
-class VolumeData:
+class VolumeData(BaseModel):
     """Volumetric and distance metrics for analysis region."""
     cone_intersection_volume_m3: float
     distance_a_to_cross_ab: float
@@ -54,7 +79,7 @@ class VolumeData:
 
 
 @dataclass(slots=True)
-class GeoData:
+class GeoData(BaseModel):
     """
     Model that holds geo data of the sites.
     """
@@ -68,15 +93,9 @@ class GeoData:
     mag_azimuth_b_a: Angle
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "distance_km": float(self.distance),
-            "mag_declination_a": float(self.mag_declination_a),
-            "mag_declination_b": float(self.mag_declination_b),
-            "true_azimuth_a_b": float(self.true_azimuth_a_b),
-            "true_azimuth_b_a": float(self.true_azimuth_b_a),
-            "mag_azimuth_a_b": float(self.mag_azimuth_a_b),
-            "mag_azimuth_b_a": float(self.mag_azimuth_b_a),
-        }
+        data = BaseModel.to_dict(self)
+        data["distance_km"] = data.pop("distance")
+        return data
 
     def __repr__(self) -> str:
         return (
@@ -90,7 +109,7 @@ class GeoData:
 
 
 @dataclass(slots=True)
-class PathData:
+class PathData(BaseModel):
     """
     Model that holds path-related data.
 
@@ -122,7 +141,8 @@ class HCAData(NamedTuple):
     b2_idx: int
 
 
-class ProfileViewData(NamedTuple):
+@dataclass(slots=True)
+class ProfileViewData(BaseModel):
     """
     Container for elevation profile and its corresponding baseline values.
     """
@@ -132,7 +152,7 @@ class ProfileViewData(NamedTuple):
 
 
 @dataclass(slots=True)
-class ProfileData:
+class ProfileData(BaseModel):
     """
     Aggregated profile outputs: flat, curved, and sight-line data.
 

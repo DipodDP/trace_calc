@@ -97,27 +97,26 @@ class OrchestrationService:
             input_data.site_a_coordinates,
             input_data.site_b_coordinates
         )
-        result.metadata["geo_data"] = geo_data.to_dict()  # Add geo_data to result metadata
+        result.result["geo_data"] = geo_data.to_dict()  # Add geo_data to result metadata
+
+        profile_data = result.result.get("profile_data")
 
         # Step 3: Display output (optional, injected dependency)
         if display_output and self.output_formatter:
             # Pass input_data to formatter for coordinates and other context
             self.output_formatter.format_result(
-                result, input_data=input_data, geo_data=geo_data
+                result, input_data=input_data, geo_data=geo_data, profile_data=profile_data
             )
 
         # Step 4: Generate visualization (optional, injected dependency)
-        if generate_plot and self.visualizer:
-            # The profile_data is now calculated inside the analysis service and can be accessed from the result metadata
-            profile_data = result.metadata.get("profile_data")
-            if profile_data:
-                self.visualizer.plot_profile(
-                    path,
-                    profile_data,
-                    result,
-                    save_path=save_plot_path,
-                    show=save_plot_path is None,
-                )
+        if generate_plot and self.visualizer and profile_data:
+            self.visualizer.plot_profile(
+                path,
+                profile_data,
+                result,
+                save_path=save_plot_path,
+                show=save_plot_path is None,
+            )
 
         return result
 

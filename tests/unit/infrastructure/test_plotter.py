@@ -41,7 +41,7 @@ class TestProfileVisualizer(unittest.TestCase):
         profile_data.intersections.beam_intersection_point.angle = 3.50
 
         analysis_result = MagicMock(spec=AnalysisResult)
-        analysis_result.metadata = {
+        analysis_result.result = {
             "b1_max": 0.5,
             "b2_max": 0.6,
             "b_sum": 1.1,
