@@ -24,7 +24,7 @@ def mock_dependencies():
 
         # Configure mocks
         MockEnv.return_value.str.side_effect = lambda x: f"mock_{x}"
-        mock_input.side_effect = ["test_path", "", "", "50.0 14.0", "50.1 14.1"] # Simulate user input for file name, default antenna heights, and coordinates
+        mock_input.side_effect = ["test_path", "", "", "50.0 14.0 50.1 14.1", ""] # Simulate user input
 
         # Mock the async load/store methods
         mock_storage_instance = MockFilePathStorage.return_value
