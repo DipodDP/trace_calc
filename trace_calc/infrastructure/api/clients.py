@@ -8,7 +8,7 @@ from typing import Any, cast
 
 import numpy as np
 import requests
-from httpx import AsyncClient, QueryParams, Response
+from httpx import AsyncClient, QueryParams, Response, Timeout
 from numpy.typing import NDArray
 from progressbar import ProgressBar
 
@@ -20,6 +20,7 @@ from trace_calc.domain.interfaces import (
 )
 from trace_calc.domain.exceptions import APIException
 
+from .decorators import async_retry
 from trace_calc.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -86,8 +87,9 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
 
 
 class AsyncElevationsApiClient(BaseElevationsApiClient):
+    @async_retry()
     async def elevations_api_request(
-        self, coord_vect_block: NDArray[np.floating[Any]]
+        self, coord_vect_block: NDArray[np.floating[Any]], **kwargs
     ) -> list[Elevation]:
         """Asynchronous API request with httpx"""
         headers = {
@@ -100,15 +102,15 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
         querystring["points"] = querystring["points"][:-1] + "]"
 
-        logger.info("------- Start fetching block of elevations -------")
-        logger.debug(f"Query string: {querystring['points'][:80]}...")
+        timeout = kwargs.get("timeout", 10.0)
+        # Configure timeout with connect and read timeouts
+        timeout_config = Timeout(timeout, connect=5.0)
 
-        async with AsyncClient() as client:
-            response = await client.get(
-                self.api_url, headers=headers, params=querystring, timeout=10.0
-            )
-            logger.info(f"------- Got response ------- {response.status_code}")
-            logger.debug(f"Request URL: {response.request.url}")
+        async with AsyncClient(timeout=timeout_config, follow_redirects=True) as client:
+            request = client.build_request("GET", self.api_url, params=querystring, headers=headers)
+            logger.info(f"HTTP Request: {request.method} {request.url}")
+            response = await client.send(request)
+            logger.info(f"HTTP Response: {response.status_code}")
 
             if not response.is_success:
                 try:
@@ -150,25 +152,24 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
         tasks = [self.elevations_api_request(block) for block in coord_vect_blocks]
         logger.debug(f"Created {len(tasks)} task(s) for async execution")
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        successes: list[list[Elevation]] = []
+        
+        successes: list[list[Elevation] | None] = [None] * blocks_num
         errors = []
 
         for idx, result in enumerate(results):
             if isinstance(result, BaseException):
                 errors.append((idx, result))
-                # TODO: For API errors, consider adding retry logic here
-                # if isinstance(result, APIException):
-                # logger.error(f"API failed for task {idx}: {str(result)}")
             else:
-                successes.append(result)
+                successes[idx] = result
 
         logger.info(f"---- Got {len(results)} blocks -----")
 
         if errors:
             raise APIException(errors)
 
-        if not successes:
-            return np.array([], dtype=np.float64)
+        if not all(s is not None for s in successes):
+            # This case should ideally not be reached if no errors were raised
+            raise Exception("Failed to fetch some elevation blocks without raising an exception.")
 
         return np.concatenate([np.array(s, dtype=np.float64) for s in successes])
 
@@ -203,7 +204,8 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
         await response.aclose()
         return Angle(Degrees(declination))
 
-    async def declination_api_request(self, coordinate: Coordinates) -> Angle:
+    @async_retry()
+    async def declination_api_request(self, coordinate: Coordinates, **kwargs) -> Angle:
         """Magnet Declination API request with httpx"""
 
         month = datetime.now().month
@@ -219,12 +221,16 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
                 "startMonth": month,
             }
         )
-        logger.debug("------- Start fetching magnet declination -------")
-        async with AsyncClient() as client:
-            response = await client.get(self.api_url, params=params, timeout=10.0)
-            logger.debug(
-                f"------- Got response for {response.url} with status code {response.status_code} -------"
-            )
+        timeout = kwargs.get("timeout", 10.0)
+        # Configure timeout with connect and read timeouts
+        timeout_config = Timeout(timeout, connect=5.0)
+
+        async with AsyncClient(timeout=timeout_config, follow_redirects=True) as client:
+            request = client.build_request("GET", self.api_url, params=params)
+            logger.info(f"HTTP Request: {request.method} {request.url}")
+            response = await client.send(request)
+            logger.info(f"HTTP Response: {response.status_code}")
+
             if not response.is_success:
                 try:
                     error_data = response.json()

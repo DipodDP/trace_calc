@@ -2,6 +2,7 @@
 
 import pytest
 import numpy as np
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx # Import httpx
 
@@ -261,13 +262,66 @@ async def test_mag_declination_api_client_invalid_key_raises_exception(mag_decli
     mock_response.status_code = 400
     mock_response.json.return_value = {"message": "Bad request. Either the key parameter is missing or it is wrong."}
     mock_response.text = "Bad request. Either the key parameter is missing or it is wrong."
-    mock_response.request.url = "http://mockurl.com" # Mock URL for logging
+    mock_response.request = MagicMock() # Mock the request attribute
+    mock_response.request.url = "http://mockurl.com"
 
-    with patch("httpx.AsyncClient.get", AsyncMock(return_value=mock_response)):
-        dummy_coords = [Coordinates(lat=0.0, lon=0.0), Coordinates(lat=1.0, lon=1.0)]
+    # The decorator will retry, so we need to mock the response for each attempt
+    with patch("httpx.AsyncClient.send", AsyncMock(return_value=mock_response)):
+        dummy_coords = [Coordinates(lat=0.0, lon=0.0)]
 
         with pytest.raises(APIException) as excinfo:
             await mag_declination_api_client.fetch_declinations(dummy_coords)
 
-        assert "400 - Bad request. Either the key parameter is missing or it is wrong." in str(excinfo.value)
+        # The retry decorator wraps the exception. We need to check inside.
+        assert isinstance(excinfo.value.args[0][0][1], APIException)
+        assert "400 - Bad request. Either the key parameter is missing or it is wrong." in str(excinfo.value.args[0][0][1])
 
+
+@pytest.mark.asyncio
+async def test_fetch_elevations_preserves_order_with_async_delays(elevations_api_client):
+    """
+    Test that fetch_elevations correctly preserves the order of elevation blocks
+    even when they are returned out of order due to network latency.
+    """
+    # Define the mock data that each block will return
+    mock_data = {
+        0: [10, 11, 12],
+        1: [20, 21, 22],
+        2: [30, 31, 32],
+    }
+    # Define the delays for each block to simulate out-of-order completion
+    delays = {
+        0: 0.3,  # 1st block returns last
+        1: 0.1,  # 2nd block returns first
+        2: 0.2,  # 3rd block returns second
+    }
+    
+    # Keep track of which block we are processing
+    call_order_tracker = []
+
+    async def mock_api_request(coord_vect_block):
+        # Identify the block by its first coordinate's latitude
+        block_id = int(coord_vect_block[0][0])
+        call_order_tracker.append(block_id)
+        
+        delay = delays[block_id]
+        await asyncio.sleep(delay)
+        
+        return mock_data[block_id]
+
+    elevations_api_client.elevations_api_request = mock_api_request
+
+    # Create a coordinate vector where the latitude of the first element identifies the block
+    block_size = 3
+    coord_vect = np.array([
+        [0.0, 0.1], [0.0, 0.2], [0.0, 0.3],  # Block 0
+        [1.0, 1.1], [1.0, 1.2], [1.0, 1.3],  # Block 1
+        [2.0, 2.1], [2.0, 2.2], [2.0, 2.3],  # Block 2
+    ])
+
+    # Fetch elevations
+    elevations = await elevations_api_client.fetch_elevations(coord_vect, block_size=block_size)
+
+    # The final concatenated array should still be in the original logical order
+    expected_elevations = np.array([10, 11, 12, 20, 21, 22, 30, 31, 32])
+    np.testing.assert_array_equal(elevations, expected_elevations, "The final elevation data is not in the correct order.")

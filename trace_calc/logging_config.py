@@ -1,6 +1,7 @@
 import logging
 import sys
 from environs import Env  # Import Env for type hinting
+from .log_filters import TruncatingFilter
 
 
 def setup_logging(env: Env):  # Added env parameter
@@ -8,7 +9,7 @@ def setup_logging(env: Env):  # Added env parameter
     if logging.root.handlers:  # Check if logging is already configured
         return
 
-    log_level_str = env.str("LOG_LEVEL", "INFO").upper()  # Use env object
+    log_level_str = env.str("LOG_LEVEL", "DEBUG").upper()  # Use env object
     numeric_level = getattr(logging, log_level_str, None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {log_level_str}")
@@ -23,8 +24,20 @@ def setup_logging(env: Env):  # Added env parameter
         stream=sys.stdout,
     )
 
-    # Set the level for the httpx logger
-    logging.getLogger("httpx").setLevel(numeric_level)
+    # Set the level for the httpx logger, add the truncating filter, and disable propagation
+    httpx_logger = logging.getLogger("httpx")
+    httpx_logger.setLevel(numeric_level)
+    httpx_logger.addFilter(TruncatingFilter(max_length=250))
+    httpx_logger.propagate = False
+
+    # Set the level for the httpcore logger
+    logging.getLogger("httpcore").setLevel(numeric_level)
+
+    # Set the level for our custom API client logger
+    api_clients_logger = logging.getLogger("trace_calc.infrastructure.api.clients")
+    api_clients_logger.setLevel(numeric_level)
+    api_clients_logger.addFilter(TruncatingFilter(max_length=250))
+
 
     # Set the level for the matplotlib logger to INFO to reduce verbosity
     logging.getLogger("matplotlib").setLevel(logging.INFO)
@@ -37,6 +50,7 @@ def setup_logging(env: Env):  # Added env parameter
         logger = logging.getLogger(logger_name)
         if logger.level == logging.NOTSET:  # Only set if not explicitly set already
             logger.setLevel(numeric_level)
+
 
 
 def get_logger(name):

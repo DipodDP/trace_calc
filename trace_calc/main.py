@@ -185,6 +185,8 @@ async def main():
         profile_service = PathProfileService(
             input_data=input_data,
             elevations_api_client=deps.elevations_api_client,
+            block_size=256,
+            resolution=0.05,
         )
 
         if path is None:
