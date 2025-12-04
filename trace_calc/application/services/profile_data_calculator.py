@@ -1,4 +1,3 @@
-from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 import dataclasses
@@ -111,7 +110,7 @@ class ProfileDataCalculator:
         antenna_elevation_angle_b: NDArray[np.float64],
         distances: NDArray[np.float64],
         elevations: NDArray[np.float64],
-    ) -> Optional[IntersectionPoint]:
+    ) -> IntersectionPoint | None:
         """
         Calculate the intersection point of the two antenna elevation angle lines.
         """

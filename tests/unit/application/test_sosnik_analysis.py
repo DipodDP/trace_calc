@@ -93,7 +93,7 @@ async def test_sosnik_analysis_service_returns_result(sample_path_data, sample_i
     assert isinstance(result, AnalysisResult)
     assert result.result["method"] == "sosnik"
     assert "L_correction" in result.model_propagation_loss_parameters
-    assert "extra_dist" in result.model_propagation_loss_parameters
+    assert "extra_distance_km" in result.model_propagation_loss_parameters
     assert "equal_dist" in result.model_propagation_loss_parameters
     assert result.link_speed is not None
     assert result.wavelength > 0
@@ -131,10 +131,10 @@ def test_sosnik_analyzer_model_parameters(sample_path_data, sample_input_data, s
     
     analyzer = SosnikAnalyzer(sample_path_data, sample_input_data)
     result = analyzer.analyze()
-    
+
     model_params = result.model_parameters
     assert "L_correction" in model_params
-    assert "extra_dist" in model_params
+    assert "extra_distance_km" in model_params
     assert "equal_dist" in model_params
 
     # Recalculate expected values for verification
@@ -153,5 +153,5 @@ def test_sosnik_analyzer_model_parameters(sample_path_data, sample_input_data, s
     expected_equal_dist = Kilometers(trace_dist + expected_extra_dist)
     
     assert model_params["L_correction"] == pytest.approx(expected_L_correction)
-    assert model_params["extra_dist"] == pytest.approx(expected_extra_dist)
+    assert model_params["extra_distance_km"] == pytest.approx(expected_extra_dist)
     assert model_params["equal_dist"] == pytest.approx(expected_equal_dist)

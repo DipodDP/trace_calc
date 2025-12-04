@@ -6,15 +6,16 @@ class TruncatingFilter(logging.Filter):
         self.max_length = max_length
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if record.args:  # Check if arguments are present (typically for format strings)
+        if record.args:  # Check if arguments are present
             new_args = []
             for arg in record.args:
-                if isinstance(arg, str) and len(arg) > self.max_length:
-                    new_args.append(arg[:self.max_length] + "...")
+                s_arg = str(arg)  # Get string representation
+                if len(s_arg) > self.max_length:
+                    new_args.append(s_arg[:self.max_length] + "...")
                 else:
-                    new_args.append(arg)
+                    new_args.append(arg)  # Keep original object
             record.args = tuple(new_args)
         elif isinstance(record.msg, str) and len(record.msg) > self.max_length:
-            # If no args, and it's a string, truncate the message itself (f-string or literal)
+            # For f-strings or literals
             record.msg = record.msg[:self.max_length] + "..."
         return True

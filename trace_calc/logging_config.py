@@ -1,22 +1,24 @@
 import logging
 import sys
-from environs import Env  # Import Env for type hinting
+from environs import Env
 from .log_filters import TruncatingFilter
 
 
-def setup_logging(env: Env):  # Added env parameter
+def setup_logging(env: Env) -> None:
     """Set up logging configuration."""
     if logging.root.handlers:  # Check if logging is already configured
         return
 
-    log_level_str = env.str("LOG_LEVEL", "DEBUG").upper()  # Use env object
+    log_level_str = env.str("LOGGING_LEVEL", "INFO").upper()
+
+    # DEBUG flag overrides log level when set to True
+    debug_mode = env.bool("DEBUG", default=False)
+    if debug_mode:
+        log_level_str = "DEBUG"
+
     numeric_level = getattr(logging, log_level_str, None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {log_level_str}")
-
-    print(
-        f"DEBUG: setup_logging received LOG_LEVEL='{log_level_str}' (numeric: {numeric_level})"
-    )  # Debug print
 
     logging.basicConfig(
         level=numeric_level,
@@ -27,7 +29,7 @@ def setup_logging(env: Env):  # Added env parameter
     # Set the level for the httpx logger, add the truncating filter, and disable propagation
     httpx_logger = logging.getLogger("httpx")
     httpx_logger.setLevel(numeric_level)
-    httpx_logger.addFilter(TruncatingFilter(max_length=250))
+    httpx_logger.addFilter(TruncatingFilter(max_length=105))
     httpx_logger.propagate = False
 
     # Set the level for the httpcore logger
@@ -36,7 +38,7 @@ def setup_logging(env: Env):  # Added env parameter
     # Set the level for our custom API client logger
     api_clients_logger = logging.getLogger("trace_calc.infrastructure.api.clients")
     api_clients_logger.setLevel(numeric_level)
-    api_clients_logger.addFilter(TruncatingFilter(max_length=250))
+    api_clients_logger.addFilter(TruncatingFilter(max_length=105))
 
 
     # Set the level for the matplotlib logger to INFO to reduce verbosity
@@ -52,7 +54,6 @@ def setup_logging(env: Env):  # Added env parameter
             logger.setLevel(numeric_level)
 
 
-
-def get_logger(name):
+def get_logger(name: str) -> logging.Logger:
     """Get a logger instance."""
     return logging.getLogger(name)

@@ -128,68 +128,55 @@ poetry install
 poetry add /path/to/trace_calc
 ```
 
+**From GitHub repository (using poetry):**
+```bash
+poetry add git+https://github.com/DipodDP/tgbot_troposcatter.git#subdirectory=trace_calc
+```
+
 ### Basic Programmatic Usage
+
+The easiest way to use the package is through the `TraceAnalyzerAPI`, which simplifies dependency setup and analysis calls.
 
 ```python
 import asyncio
-from trace_calc.domain.models.coordinates import Coordinates, InputData
-from trace_calc.domain.models.units import Meters
-from trace_calc.application.analysis import GrozaAnalysisService
-from trace_calc.application.orchestration import OrchestrationService
-from trace_calc.application.services.profile import PathProfileService
-from trace_calc.infrastructure.api.clients import (
-    AsyncElevationsApiClient,
-    AsyncMagDeclinationApiClient,
-)
+from environs import Env
+from trace_calc import TraceAnalyzerAPI
 
 async def analyze_link():
-    # 1. Create input data
-    input_data = InputData(
-        path_name="my_path",
-        site_a_coordinates=Coordinates(55.7558, 37.6173),
-        site_b_coordinates=Coordinates(59.9343, 30.3351),
-        frequency_mhz=5000.0,
-        antenna_a_height=Meters(30.0),
-        antenna_b_height=Meters(30.0),
-    )
+    # 1. Load environment variables from .env file
+    env = Env()
+    env.read_env()
 
-    # 2. Initialize API clients
-    elevations_client = AsyncElevationsApiClient(api_url, api_key)
-    declinations_client = AsyncMagDeclinationApiClient(api_url, api_key)
+    # 2. Create the facade, which handles all dependency setup
+    analyzer_api = TraceAnalyzerAPI.create_from_env(env)
 
-    # 3. Create services
-    profile_service = PathProfileService(
-        input_data=input_data,
-        elevations_api_client=elevations_client,
-        block_size=256,
-        resolution=0.05,
-    )
+    # 3. Define path details
+    coord_a = [55.7558, 37.6173]  # Moscow
+    coord_b = [59.9343, 30.3351]  # St. Petersburg
+    path_filename = "my_path"
 
-    analysis_service = GrozaAnalysisService()  # or SosnikAnalysisService()
-
-    orchestrator = OrchestrationService(
-        analysis_service=analysis_service,
-        profile_service=profile_service,
-        declinations_api_client=declinations_client,
-    )
-
-    # 4. Run analysis
-    result = await orchestrator.process(
-        input_data=input_data,
+    # 4. Run analysis with a single method call
+    (
+        L0, Lmed, Lr, trace_dist, b1_max, b2_max,
+        b_sum, Ltot, dL, speed, sp_pref
+    ) = await analyzer_api.analyze_groza(
+        coord_a=coord_a,
+        coord_b=coord_b,
+        path_filename=path_filename,
         antenna_a_height=30.0,
         antenna_b_height=30.0,
-        display_output=False,
-        generate_plot=False,
     )
 
     # 5. Access results
-    print(f"Link Speed: {result.link_speed} Mbps")
-    print(f"Total Loss: {result.model_propagation_loss_parameters['total_loss']} dB")
+    print(f"Link Speed: {speed:.1f} {sp_pref}bps")
+    print(f"Total Loss: {Ltot:.2f} dB")
+    print(f"Distance: {trace_dist:.1f} km")
 
-    return result
-
+# Run the analysis
 asyncio.run(analyze_link())
 ```
+
+For more advanced use cases, such as injecting custom services or using lower-level components, see the files in the `/examples` directory.
 
 ### Accessing Structured Results
 

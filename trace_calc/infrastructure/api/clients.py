@@ -260,9 +260,6 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
         for idx, result in enumerate(results):
             if isinstance(result, BaseException):
                 errors.append((idx, result))
-                # TODO: For API errors, consider adding retry logic here
-                # if isinstance(result, APIException):
-                # logger.error(f"API failed for task {idx}: {str(result)}")
             else:
                 declinations.append(result)
 

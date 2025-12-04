@@ -1,7 +1,5 @@
 """Orchestration service (coordinates workflow with dependency injection)"""
 
-from typing import Optional
-
 from trace_calc.domain.models.coordinates import InputData, Coordinates
 from trace_calc.domain.models.analysis import AnalysisResult
 from trace_calc.application.analysis import (
@@ -29,8 +27,8 @@ class OrchestrationService:
         analysis_service: BaseAnalysisService,
         profile_service: PathProfileService,
         declinations_api_client: BaseDeclinationsApiClient,
-        output_formatter: Optional[OutputFormatter] = None,
-        visualizer: Optional[ProfileVisualizer] = None,
+        output_formatter: OutputFormatter | None = None,
+        visualizer: ProfileVisualizer | None = None,
     ):
         """
         Initialize orchestration service with injected dependencies.
@@ -54,8 +52,9 @@ class OrchestrationService:
         antenna_b_height: float,
         display_output: bool = True,
         generate_plot: bool = True,
-        path: Optional[PathData] = None,
-        save_plot_path: Optional[str] = None,
+        path: PathData | None = None,
+        save_plot_path: str | None = None,
+        geo_data: GeoData | None = None,
     ) -> AnalysisResult:
         """
         Execute complete analysis workflow.
@@ -91,13 +90,14 @@ class OrchestrationService:
             antenna_b_height=antenna_b_height,
         )
 
-        # Always calculate GeoData
-        geo_data_service = GeoDataService(self.declinations_api_client)
-        geo_data = await geo_data_service.process(
-            input_data.site_a_coordinates,
-            input_data.site_b_coordinates
-        )
-        result.result["geo_data"] = geo_data.to_dict()  # Add geo_data to result metadata
+        # Calculate GeoData if not provided
+        if geo_data is None:
+            geo_data_service = GeoDataService(self.declinations_api_client)
+            geo_data = await geo_data_service.process(
+                input_data.site_a_coordinates, input_data.site_b_coordinates
+            )
+
+        result.result["geo_data"] = geo_data.to_dict()
 
         profile_data = result.result.get("profile_data")
 
@@ -105,7 +105,10 @@ class OrchestrationService:
         if display_output and self.output_formatter:
             # Pass input_data to formatter for coordinates and other context
             self.output_formatter.format_result(
-                result, input_data=input_data, geo_data=geo_data, profile_data=profile_data
+                result,
+                input_data=input_data,
+                geo_data=geo_data,
+                profile_data=profile_data,
             )
 
         # Step 4: Generate visualization (optional, injected dependency)
@@ -121,7 +124,7 @@ class OrchestrationService:
         return result
 
 
-class GeoDataService: 
+class GeoDataService:
     """
     Computes geographic metadata between two coordinates.
     """

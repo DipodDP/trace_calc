@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from trace_calc.domain.models.units import Angle, Kilometers, Loss, Speed
 from trace_calc.domain.interfaces import BaseSpeedCalculator
 
@@ -7,7 +5,7 @@ from trace_calc.domain.interfaces import BaseSpeedCalculator
 class GrozaSpeedCalculator(BaseSpeedCalculator):
     def calculate_speed(
         self, L0: Loss, Lmed: Loss, Lr: Loss, Lk: Loss, Ld: float
-    ) -> Tuple[Loss, Loss, Speed]:
+    ) -> tuple[Loss, Loss, Speed]:
         L: Loss = Loss(L0 + Lmed + Lr + Lk + Ld)
         dL: Loss = Loss(L - 233.8)
         if dL > -1.66:
@@ -22,7 +20,7 @@ class GrozaSpeedCalculator(BaseSpeedCalculator):
 class SosnikSpeedCalculator(BaseSpeedCalculator):
     def calculate_speed(
         self, trace_dist: Kilometers, L_correction: Loss, b_sum: Angle
-    ) -> Tuple[Speed, Kilometers, Kilometers]:
+    ) -> tuple[Speed, Kilometers, Kilometers]:
         extra_dist: Kilometers = Kilometers(148 * b_sum) if b_sum > 0 else Kilometers(0)
         equal_dist: Kilometers = Kilometers(trace_dist + extra_dist)
 

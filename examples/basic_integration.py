@@ -17,6 +17,7 @@ Requirements:
 """
 
 import asyncio
+from trace_calc.adapter import TraceAnalyzerAPI
 from trace_calc.domain.models.coordinates import Coordinates, InputData
 from trace_calc.domain.models.units import Meters
 from trace_calc.application.analysis import GrozaAnalysisService
@@ -242,9 +243,55 @@ async def example_with_multiple_paths():
     return results
 
 
+async def example_with_facade():
+    """
+    Example showing how to use the TraceAnalyzerAPI for simplified integration.
+    This is the recommended approach for most external applications.
+    """
+    print("\n=== Running analysis with TraceAnalyzerAPI ===")
+    try:
+        # The facade internally handles dependency creation from environment variables.
+        # For this example, we mock the environment. In a real app, you would
+        # have a .env file or your environment variables set.
+        from unittest.mock import MagicMock
+        env = MagicMock()
+        env.str.side_effect = {
+            "ELEVATION_API_URL": Config.ELEVATION_API_URL,
+            "ELEVATION_API_KEY": Config.ELEVATION_API_KEY,
+            "DECLINATION_API_URL": Config.DECLINATION_API_URL,
+            "DECLINATION_API_KEY": Config.DECLINATION_API_KEY,
+        }.get
+
+        # 1. Create the facade from the environment
+        facade = TraceAnalyzerAPI.create_from_env(env)
+
+        # 2. Run analysis with a single method call
+        (
+            L0, Lmed, Lr, trace_dist, b1_max, b2_max,
+            b_sum, Ltot, dL, speed, sp_pref
+        ) = await facade.analyze_groza(
+            coord_a=[55.7558, 37.6173],
+            coord_b=[59.9343, 30.3351],
+            path_filename="moscow_spb_facade",
+            antenna_a_height=30.0,
+            antenna_b_height=30.0,
+        )
+
+        print(f"✓ Facade analysis complete! Link speed: {speed:.1f} {sp_pref}bps")
+        print(f"  Total Loss: {Ltot:.2f} dB")
+        print(f"  Distance: {trace_dist:.1f} km")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        # In a real app, you might want more specific error handling
+        # for APIException, ValueError, etc.
+
 if __name__ == "__main__":
     # Run single analysis example
-    asyncio.run(example_usage())
+    # asyncio.run(example_usage())
+
+    # Run the simplified facade example
+    asyncio.run(example_with_facade())
 
     # Uncomment to run multiple paths example:
     # asyncio.run(example_with_multiple_paths())
