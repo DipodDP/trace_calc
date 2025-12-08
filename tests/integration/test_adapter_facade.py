@@ -116,7 +116,7 @@ def trace_analyzer_api():
     storage.load = AsyncMock(side_effect=FileNotFoundError) # Always fetch from api
     storage.store = AsyncMock()
     
-    facade = TraceAnalyzerAPI.create_from_env(env)
+    facade = TraceAnalyzerAPI.create_from_config(env, storage)
     
     # Replace clients with mocks
     facade._elevations_api_client = elevations_client

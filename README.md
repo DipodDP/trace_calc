@@ -33,12 +33,24 @@ You need to get an API key for using the [Elevations API on RapidAPI](https://ra
 
 ### Common Volume Analysis (CVA)
 
-This project features advanced Common Volume Analysis, which calculates the shared illuminated volume between two antennas, considering their half-power beamwidths (HPBW). It provides detailed metrics essential for enhanced troposcatter link design, including:
+This project features  Common Volume Analysis, which calculates the shared illuminated volume between two antennas, considering their half-power beamwidths (HPBW). It provides detailed metrics essential for enhanced troposcatter link design, including:
 
 *   **Multiple Sight Lines**: Generates lower and upper sight lines with configurable angular offsets.
 *   **Four Intersection Points**: Identifies key intersections between sight lines.
-*   **Volumetric Data**: Computes the 3D volume of the intersection region.
+*   **Volumetric Data**: Computes the 3D volume of the intersection region using circular cross-section approximation.
 *   **Beam Intersection Point Analysis**: A dedicated analysis to identify the intersection point of two beam intersection point lines.
+
+**Volume Calculation Method**
+
+The common scatter volume represents the 3D region where antenna beams overlap:
+
+1. **Beam Model:** Each beam spans from lower edge (clearing horizon) to upper edge (lower + HPBW)
+2. **Overlap Region:** Between Cross_AB and Cross_BA intersection points
+3. **Cross-section:** Circular, with diameter = vertical height between beam edges
+4. **Volume Formula:** `V = ∫ π·h(x)² dx` where `h(x)` = height between beam edges at distance x
+5. **Integration:** Trapezoidal rule over the overlap region
+
+**Note:** Volume assumes circular cross-section (simplified from elliptical antenna patterns)
 
 ### Structured Output & Geographic Data
 
@@ -141,6 +153,8 @@ The easiest way to use the package is through the `TraceAnalyzerAPI`, which simp
 import asyncio
 from environs import Env
 from trace_calc import TraceAnalyzerAPI
+from trace_calc.infrastructure.storage import FilePathStorage
+from trace_calc.domain.constants import OUTPUT_DATA_DIR
 
 async def analyze_link():
     # 1. Load environment variables from .env file
@@ -148,7 +162,26 @@ async def analyze_link():
     env.read_env()
 
     # 2. Create the facade, which handles all dependency setup
-    analyzer_api = TraceAnalyzerAPI.create_from_env(env)
+    #    (See "Extending with Custom Models" section for detailed dependency injection)
+
+
+    class AppConfig:
+        def __init__(self, elevation_api_url, elevation_api_key, declination_api_url, declination_api_key):
+            self.trace_calc = type('TraceCalcConfig', (object,), {
+                'elevation_api_url': elevation_api_url,
+                'elevation_api_key': elevation_api_key,
+                'declination_api_url': declination_api_url,
+                'declination_api_key': declination_api_key,
+            })()
+
+    config = AppConfig(
+        elevation_api_url=env.str("ELEVATION_API_URL"),
+        elevation_api_key=env.str("ELEVATION_API_KEY"),
+        declination_api_url=env.str("DECLINATION_API_URL"),
+        declination_api_key=env.str("DECLINATION_API_KEY")
+    )
+    storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
+    analyzer_api = TraceAnalyzerAPI.create_from_config(config, storage)
 
     # 3. Define path details
     coord_a = [55.7558, 37.6173]  # Moscow
@@ -158,7 +191,7 @@ async def analyze_link():
     # 4. Run analysis with a single method call
     (
         L0, Lmed, Lr, trace_dist, b1_max, b2_max,
-        b_sum, Ltot, dL, speed, sp_pref
+        b_sum, Ltot, dL, speed, sp_pref, result
     ) = await analyzer_api.analyze_groza(
         coord_a=coord_a,
         coord_b=coord_b,
@@ -180,17 +213,45 @@ For more advanced use cases, such as injecting custom services or using lower-le
 
 ### Accessing Structured Results
 
-Results are returned as immutable dataclasses with `to_dict()` methods for JSON serialization:
+Results are returned as immutable dataclasses with `to_dict()` methods for JSON serialization.
+The `result` object returned by `analyze_groza` or `analyze_sosnik` is an `AnalysisResult` dataclass instance.
 
 ```python
-# Get structured data
-geo_data = result.result['geo_data']
-profile_data = result.result['profile_data']
+# Assuming 'result' is the AnalysisResult object obtained from analyze_groza/sosnik
 
-# Convert to JSON
+# Access structured data directly from the AnalysisResult object
+geo_data_from_result = result.result.get('geo_data')
+profile_data_from_result = result.profile_data
+
+print(f"Geo Data: {geo_data_from_result}")
+print(f"Profile Data: {profile_data_from_result}")
+
+# For full JSON output, an InputData object is also required.
+# In a real application, you would have access to the InputData that
+# was used to initiate the analysis. For demonstration:
+from trace_calc.domain.models.coordinates import Coordinates, InputData
+from trace_calc.domain.models.units import Meters
 from trace_calc.infrastructure.output.formatters import JSONOutputFormatter
+
+# Reconstruct a basic InputData for demonstration if needed, or use the original
+input_data_for_formatter = InputData(
+    path_name="my_path", # Replace with actual path name
+    site_a_coordinates=Coordinates(55.7558, 37.6173), # Replace with actual coords
+    site_b_coordinates=Coordinates(59.9343, 30.3351), # Replace with actual coords
+    frequency_mhz=5000.0,
+    antenna_a_height=Meters(30.0),
+    antenna_b_height=Meters(30.0),
+)
+
 formatter = JSONOutputFormatter()
-json_output = formatter.format_result(result, input_data, geo_data, profile_data)
+json_output = formatter.format_result(
+    analysis_result=result,
+    input_data=input_data_for_formatter,
+    geo_data=geo_data_from_result,
+    profile_data=profile_data_from_result
+)
+print("--- Full JSON Output (truncated) ---")
+print(json_output[:500]) # Print first 500 characters of JSON
 ```
 
 **See [examples/basic_integration.py](examples/basic_integration.py) for a complete working example.**
@@ -234,17 +295,17 @@ The application follows a **three-layer Domain-Driven Design (DDD)** architectur
 
 ### Key Modules
 
-| Module | Purpose |
-|--------|---------|
-| `trace_calc.domain.models` | Data models (InputData, PathData, AnalysisResult, etc.) |
-| `trace_calc.domain.interfaces` | Abstract base classes defining contracts |
-| `trace_calc.domain.units` | Type-safe unit definitions (Meters, Kilometers, etc.) |
-| `trace_calc.application.analysis` | Analysis services (Groza, Sosnik strategies) |
-| `trace_calc.application.orchestration` | Workflow coordination with DI |
-| `trace_calc.application.services` | Profile, coordinates, HCA services |
-| `trace_calc.infrastructure.api` | External API clients (async with retry logic) |
-| `trace_calc.infrastructure.storage` | File-based persistence |
-| `trace_calc.infrastructure.output` | Output formatters (console, JSON) |
+| Module                                 | Purpose                                                 |
+| -------------------------------------- | ------------------------------------------------------- |
+| `trace_calc.domain.models`             | Data models (InputData, PathData, AnalysisResult, etc.) |
+| `trace_calc.domain.interfaces`         | Abstract base classes defining contracts                |
+| `trace_calc.domain.units`              | Type-safe unit definitions (Meters, Kilometers, etc.)   |
+| `trace_calc.application.analysis`      | Analysis services (Groza, Sosnik strategies)            |
+| `trace_calc.application.orchestration` | Workflow coordination with DI                           |
+| `trace_calc.application.services`      | Profile, coordinates, HCA services                      |
+| `trace_calc.infrastructure.api`        | External API clients (async with retry logic)           |
+| `trace_calc.infrastructure.storage`    | File-based persistence                                  |
+| `trace_calc.infrastructure.output`     | Output formatters (console, JSON)                       |
 
 **For detailed API documentation, see the docstrings in each module.**
 
@@ -440,15 +501,15 @@ async def test_with_mocked_api():
 
 Located in `trace_calc.domain.models`:
 
-| Model | Purpose | Source |
-|-------|---------|--------|
-| `InputData` | User input (coordinates, frequency, antenna heights) | [coordinates.py](trace_calc/domain/models/coordinates.py) |
-| `PathData` | Path coordinates, distances, elevations | [path.py](trace_calc/domain/models/path.py) |
-| `ProfileData` | Sight lines, intersections, volume data | [path.py](trace_calc/domain/models/path.py) |
-| `HCAData` | Horizon clearance angles (b1_max, b2_max, b_sum) | [path.py](trace_calc/domain/models/path.py) |
-| `GeoData` | Geographic metadata (distance, azimuths, declinations) | [path.py](trace_calc/domain/models/path.py) |
-| `AnalysisResult` | Complete analysis result | [analysis.py](trace_calc/domain/models/analysis.py) |
-| `PropagationLoss` | Loss components breakdown | [analysis.py](trace_calc/domain/models/analysis.py) |
+| Model             | Purpose                                                | Source                                                    |
+| ----------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| `InputData`       | User input (coordinates, frequency, antenna heights)   | [coordinates.py](trace_calc/domain/models/coordinates.py) |
+| `PathData`        | Path coordinates, distances, elevations                | [path.py](trace_calc/domain/models/path.py)               |
+| `ProfileData`     | Sight lines, intersections, volume data                | [path.py](trace_calc/domain/models/path.py)               |
+| `HCAData`         | Horizon clearance angles (b1_max, b2_max, b_sum)       | [path.py](trace_calc/domain/models/path.py)               |
+| `GeoData`         | Geographic metadata (distance, azimuths, declinations) | [path.py](trace_calc/domain/models/path.py)               |
+| `AnalysisResult`  | Complete analysis result                               | [analysis.py](trace_calc/domain/models/analysis.py)       |
+| `PropagationLoss` | Loss components breakdown                              | [analysis.py](trace_calc/domain/models/analysis.py)       |
 
 ### Type-Safe Units
 
@@ -463,27 +524,27 @@ Located in `trace_calc.domain.models.units`:
 
 Located in `trace_calc.domain.interfaces`:
 
-| Interface | Purpose | Key Methods |
-|-----------|---------|-------------|
-| `BaseAnalyzer` | Propagation model analyzer | `analyze(**kwargs)` |
-| `BaseSpeedCalculator` | Speed calculation logic | `calculate_speed(*args)` |
-| `BaseHCACalculator` | HCA calculation | `calculate_hca()` |
-| `BaseElevationsApiClient` | Elevation data source | `fetch_elevations(coord_vect, block_size)` |
-| `BaseDeclinationsApiClient` | Declination data source | `fetch_declinations(coordinates)` |
-| `BasePathStorage` | Path data persistence | `load(filename)`, `store(filename, data)` |
+| Interface                   | Purpose                    | Key Methods                                |
+| --------------------------- | -------------------------- | ------------------------------------------ |
+| `BaseAnalyzer`              | Propagation model analyzer | `analyze(**kwargs)`                        |
+| `BaseSpeedCalculator`       | Speed calculation logic    | `calculate_speed(*args)`                   |
+| `BaseHCACalculator`         | HCA calculation            | `calculate_hca()`                          |
+| `BaseElevationsApiClient`   | Elevation data source      | `fetch_elevations(coord_vect, block_size)` |
+| `BaseDeclinationsApiClient` | Declination data source    | `fetch_declinations(coordinates)`          |
+| `BasePathStorage`           | Path data persistence      | `load(filename)`, `store(filename, data)`  |
 
 ### Main Services
 
 Located in `trace_calc.application`:
 
-| Service | Purpose | Source |
-|---------|---------|--------|
-| `OrchestrationService` | Workflow coordination (DI container) | [orchestration.py](trace_calc/application/orchestration.py) |
-| `GrozaAnalysisService` | Groza propagation model | [analysis.py](trace_calc/application/analysis.py) |
-| `SosnikAnalysisService` | Sosnik propagation model | [analysis.py](trace_calc/application/analysis.py) |
-| `PathProfileService` | Elevation profile fetching | [services/profile.py](trace_calc/application/services/profile.py) |
-| `CoordinatesService` | Geographic calculations | [services/coordinates.py](trace_calc/application/services/coordinates.py) |
-| `GeoDataService` | Geographic metadata | [orchestration.py](trace_calc/application/orchestration.py) |
+| Service                 | Purpose                              | Source                                                                    |
+| ----------------------- | ------------------------------------ | ------------------------------------------------------------------------- |
+| `OrchestrationService`  | Workflow coordination (DI container) | [orchestration.py](trace_calc/application/orchestration.py)               |
+| `GrozaAnalysisService`  | Groza propagation model              | [analysis.py](trace_calc/application/analysis.py)                         |
+| `SosnikAnalysisService` | Sosnik propagation model             | [analysis.py](trace_calc/application/analysis.py)                         |
+| `PathProfileService`    | Elevation profile fetching           | [services/profile.py](trace_calc/application/services/profile.py)         |
+| `CoordinatesService`    | Geographic calculations              | [services/coordinates.py](trace_calc/application/services/coordinates.py) |
+| `GeoDataService`        | Geographic metadata                  | [orchestration.py](trace_calc/application/orchestration.py)               |
 
 **Note:** This package uses strict type checking with `mypy`. All public interfaces are fully type-annotated.
 

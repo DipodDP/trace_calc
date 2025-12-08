@@ -29,6 +29,8 @@ from trace_calc.infrastructure.api.clients import (
 )
 from trace_calc.infrastructure.output.formatters import JSONOutputFormatter
 from trace_calc.domain.exceptions import APIException
+from trace_calc.infrastructure.storage import FilePathStorage
+from trace_calc.domain.constants import OUTPUT_DATA_DIR
 
 
 class Config:
@@ -36,9 +38,12 @@ class Config:
     Configuration class - alternative to .env file.
     In production, load these from environment variables or a secure config system.
     """
+
     ELEVATION_API_URL = "https://your-elevation-api.com/v1"
     ELEVATION_API_KEY = "your_elevation_api_key_here"
-    DECLINATION_API_URL = "https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination"
+    DECLINATION_API_URL = (
+        "https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination"
+    )
     DECLINATION_API_KEY = ""  # Declination API may not require a key
 
 
@@ -140,7 +145,9 @@ async def run_troposcatter_analysis(
         "link_speed_mbps": result.link_speed,
         "wavelength_m": result.wavelength,
         "distance_km": geo_data.get("distance_km") if geo_data else None,
-        "propagation_loss": result.model_propagation_loss_parameters.get("propagation_loss"),
+        "propagation_loss": result.model_propagation_loss_parameters.get(
+            "propagation_loss"
+        ),
         "total_loss_db": result.model_propagation_loss_parameters.get("total_loss"),
         "geo_data": geo_data,
         "profile_data": profile_data,
@@ -174,8 +181,8 @@ async def example_usage():
         print(f"Distance: {result['distance_km']:.1f} km")
         print(f"Total Path Loss: {result['total_loss_db']:.2f} dB")
 
-        if result['propagation_loss']:
-            loss = result['propagation_loss']
+        if result["propagation_loss"]:
+            loss = result["propagation_loss"]
             print("\nLoss Components:")
             print(f"  Free Space Loss: {loss.get('free_space_loss', 'N/A')} dB")
             print(f"  Atmospheric Loss: {loss.get('atmospheric_loss', 'N/A')} dB")
@@ -250,25 +257,52 @@ async def example_with_facade():
     """
     print("\n=== Running analysis with TraceAnalyzerAPI ===")
     try:
-        # The facade internally handles dependency creation from environment variables.
-        # For this example, we mock the environment. In a real app, you would
-        # have a .env file or your environment variables set.
-        from unittest.mock import MagicMock
-        env = MagicMock()
-        env.str.side_effect = {
-            "ELEVATION_API_URL": Config.ELEVATION_API_URL,
-            "ELEVATION_API_KEY": Config.ELEVATION_API_KEY,
-            "DECLINATION_API_URL": Config.DECLINATION_API_URL,
-            "DECLINATION_API_KEY": Config.DECLINATION_API_KEY,
-        }.get
+        # In a real app, these values would come from environment variables or a secure config system.
+        # For this example, we use the hardcoded values from the Config class above.
+        class AppConfig:
+            def __init__(
+                self,
+                elevation_api_url,
+                elevation_api_key,
+                declination_api_url,
+                declination_api_key,
+            ):
+                self.trace_calc = type(
+                    "TraceCalcConfig",
+                    (object,),
+                    {
+                        "elevation_api_url": elevation_api_url,
+                        "elevation_api_key": elevation_api_key,
+                        "declination_api_url": declination_api_url,
+                        "declination_api_key": declination_api_key,
+                    },
+                )()
 
-        # 1. Create the facade from the environment
-        facade = TraceAnalyzerAPI.create_from_env(env)
+        config = AppConfig(
+            elevation_api_url=Config.ELEVATION_API_URL,
+            elevation_api_key=Config.ELEVATION_API_KEY,
+            declination_api_url=Config.DECLINATION_API_URL,
+            declination_api_key=Config.DECLINATION_API_KEY,
+        )
+        storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
+
+        # 1. Create the facade from the config and storage
+        facade = TraceAnalyzerAPI.create_from_config(config, storage)
 
         # 2. Run analysis with a single method call
         (
-            L0, Lmed, Lr, trace_dist, b1_max, b2_max,
-            b_sum, Ltot, dL, speed, sp_pref
+            L0,
+            Lmed,
+            Lr,
+            trace_dist,
+            b1_max,
+            b2_max,
+            b_sum,
+            Ltot,
+            dL,
+            speed,
+            sp_pref,
+            result,  # Added 'result' to the unpacked tuple
         ) = await facade.analyze_groza(
             coord_a=[55.7558, 37.6173],
             coord_b=[59.9343, 30.3351],
@@ -277,14 +311,21 @@ async def example_with_facade():
             antenna_b_height=30.0,
         )
 
-        print(f"✓ Facade analysis complete! Link speed: {speed:.1f} {sp_pref}bps")
-        print(f"  Total Loss: {Ltot:.2f} dB")
-        print(f"  Distance: {trace_dist:.1f} km")
+        print(
+            f"✓ Facade analysis complete! Link speed: {result.link_speed:.1f} {sp_pref}bps"
+        )
+        print(
+            f"  Total Loss: {result.model_propagation_loss_parameters.get('total_loss', 0.0):.2f} dB"
+        )
+        print(
+            f"  Distance: {result.result.get('geo_data', {}).get('distance_km', 0.0):.1f} km"
+        )
 
     except Exception as e:
         print(f"An error occurred: {e}")
         # In a real app, you might want more specific error handling
         # for APIException, ValueError, etc.
+
 
 if __name__ == "__main__":
     # Run single analysis example

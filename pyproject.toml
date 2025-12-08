@@ -10,7 +10,7 @@ packages = [{include = "trace_calc"}]
 python = "^3.10"
 matplotlib = "^3.7.1"
 numpy = "^1.25.0"
-environs = "^9.5.0"
+environs = ">=9.5.0"
 marshmallow = "<4.0"
 requests = "^2.31.0"
 progressbar2 = "^4.5.0"

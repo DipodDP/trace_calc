@@ -1,4 +1,4 @@
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields
 from typing import Any, NamedTuple
 
 import numpy as np

@@ -1,12 +1,6 @@
-"""Facade adapter for simplified API integration."""
-
-from pathlib import Path
-from environs import Env
-
 from trace_calc.domain.models.coordinates import Coordinates, InputData
-from trace_calc.domain.models.path import GeoData
+from trace_calc.domain.models.path import GeoData, ProfileData
 from trace_calc.domain.models.units import Meters
-from trace_calc.domain.constants import OUTPUT_DATA_DIR
 from trace_calc.infrastructure.api.clients import (
     AsyncElevationsApiClient,
     AsyncMagDeclinationApiClient,
@@ -57,38 +51,25 @@ class TraceAnalyzerAPI:
         self._analysis_services: dict[str, BaseAnalysisService] = {}
 
     @classmethod
-    def create_from_env(cls, env: Env) -> "TraceAnalyzerAPI":
+    def create_from_config(cls, config, storage) -> "TraceAnalyzerAPI":
         """
         Factory method: one-line initialization from environment.
 
         Args:
-            env: Environment variable handler (Env instance)
+            config: Environment variable handler
+            storage: File storage for path data
 
         Returns:
             Configured TraceAnalyzerAPI ready to use
-
-        Example:
-            >>> from environs import Env
-            >>> env = Env()
-            >>> env.read_env()
-            >>> facade = TraceAnalyzerAPI.create_from_env(env)
         """
-        # Read environment variables
-        elevation_api_url = env.str("ELEVATION_API_URL")
-        elevation_api_key = env.str("ELEVATION_API_KEY")
-        declination_api_url = env.str("DECLINATION_API_URL")
-        declination_api_key = env.str("DECLINATION_API_KEY")
-
         # Initialize API clients
         elevations_client = AsyncElevationsApiClient(
-            elevation_api_url, elevation_api_key
+            config.trace_calc.elevation_api_url, config.trace_calc.elevation_api_key
         )
         declinations_client = AsyncMagDeclinationApiClient(
-            declination_api_url, declination_api_key
+            config.trace_calc.declination_api_url,
+            config.trace_calc.declination_api_key,
         )
-
-        # Initialize storage
-        storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
 
         return cls(elevations_client, declinations_client, storage)
 
@@ -169,7 +150,7 @@ class TraceAnalyzerAPI:
         antenna_a_height: float = 2.0,
         antenna_b_height: float = 2.0,
         geo_data: GeoData | None = None,
-    ) -> tuple[float, float, float, float, float, float, float, float, float, float, str]:
+    ) -> tuple[float, float, float, float, float, float, float, float, float, float, str, AnalysisResult]:
         """
         Run Groza propagation analysis.
 
@@ -183,7 +164,7 @@ class TraceAnalyzerAPI:
 
         Returns:
             Tuple of (L0, Lmed, Lr, trace_dist, b1_max, b2_max,
-                     b_sum, Ltot, dL, speed, sp_pref)
+                     b_sum, Ltot, dL, speed, sp_pref, result)
         """
         result = await self._run_analysis(
             "groza",
@@ -210,6 +191,7 @@ class TraceAnalyzerAPI:
             params.get("dL", 0.0),  # Differential loss
             result.link_speed,  # Speed
             result.result.get("speed_prefix", "M"),  # Speed prefix (M or k)
+            result,
         )
 
     async def analyze_sosnik(
@@ -220,7 +202,7 @@ class TraceAnalyzerAPI:
         antenna_a_height: float = 2.0,
         antenna_b_height: float = 2.0,
         geo_data: GeoData | None = None,
-    ) -> tuple[float, float, float, float, float, float, float, str]:
+    ) -> tuple[float, float, float, float, float, float, float, str, AnalysisResult]:
         """
         Run Sosnik propagation analysis.
 
@@ -234,7 +216,7 @@ class TraceAnalyzerAPI:
 
         Returns:
             Tuple of (trace_dist, extra_dist, b1_max, b2_max,
-                     b_sum, Lr, speed, sp_pref)
+                     b_sum, Lr, speed, sp_pref, result)
         """
         result = await self._run_analysis(
             "sosnik",
@@ -258,6 +240,7 @@ class TraceAnalyzerAPI:
             params.get("L_correction", 0.0),  # Roughness loss
             result.link_speed,  # Speed
             result.result.get("speed_prefix", "M"),  # Speed prefix (M or k)
+            result,
         )
 
     async def _run_analysis(

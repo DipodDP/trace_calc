@@ -189,6 +189,43 @@ def calculate_cone_intersection_volume(
     return volume
 
 
+def create_line_at_angle(
+    pivot_point: tuple[float, float],
+    angle_degrees: float,
+) -> NDArray[np.float64]:
+    """
+    Create a line equation passing through a pivot point at a specified angle.
+
+    Args:
+        pivot_point: A tuple (x0, y0) representing the point the line passes through.
+        angle_degrees: The line angle in degrees from horizontal (positive is upward).
+
+    Returns:
+        A numpy array [k, b] for the line y = kx + b, where k is in m/km.
+
+    Raises:
+        ValueError: If the angle would create a near-vertical line.
+    """
+    if not -90 < angle_degrees < 90:
+        raise ValueError("Angle must be between -90 and 90 degrees (exclusive)")
+
+    x0, y0 = pivot_point
+
+    # Convert angle to slope (m/km)
+    # For a descending line (pointing backward), the geometry requires special handling
+    # The angle_degrees is measured from horizontal, positive upward
+    k_actual = np.tan(np.deg2rad(angle_degrees))  # unitless ratio
+    k = k_actual * 1000.0  # convert to m/km
+
+    if abs(k) > 1e6:
+        raise ValueError("Angle too steep (near-vertical)")
+
+    # Calculate y-intercept
+    b = y0 - k * x0
+
+    return np.array([k, b])
+
+
 def calculate_distance_between_points(
     point_a: tuple[float, float], point_b: tuple[float, float]
 ) -> float:

@@ -58,7 +58,8 @@ class AnalysisResult:
     link_speed: float  # Mbps (estimated throughput)
     wavelength: float  # meters (radio wavelength)
     model_propagation_loss_parameters: dict[str, Any] = field(default_factory=dict)
-    result: dict[str, Any] = field(default_factory=dict)
+    result: dict[str, Any] | None = None
+    profile_data: ProfileData | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
