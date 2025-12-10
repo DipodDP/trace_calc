@@ -1,7 +1,7 @@
 """Domain models for propagation analysis results"""
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from trace_calc.domain.models.path import HCAData, ProfileData
 
@@ -38,9 +38,9 @@ class AnalyzerResult:
     model_parameters: dict[str, Any]
     link_speed: float
     wavelength: float
-    hca: Optional[HCAData] = None
-    profile_data: Optional[ProfileData] = None
-    speed_prefix: Optional[str] = None
+    hca: HCAData | None = None
+    profile_data: ProfileData | None = None
+    speed_prefix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +58,8 @@ class AnalysisResult:
     link_speed: float  # Mbps (estimated throughput)
     wavelength: float  # meters (radio wavelength)
     model_propagation_loss_parameters: dict[str, Any] = field(default_factory=dict)
-    result: dict[str, Any] = field(default_factory=dict)
+    result: dict[str, Any] | None = None
+    profile_data: ProfileData | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""

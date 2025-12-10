@@ -1,5 +1,5 @@
-from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, NamedTuple, Optional
+from dataclasses import dataclass, fields
+from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -38,7 +38,7 @@ class IntersectionPoint(BaseModel):
     distance_km: float
     elevation_sea_level: float
     elevation_terrain: float
-    angle: Optional[Angle] = None
+    angle: Angle | None = None
 
 
 @dataclass(slots=True)
@@ -59,7 +59,7 @@ class IntersectionsData(BaseModel):
     upper: IntersectionPoint
     cross_ab: IntersectionPoint
     cross_ba: IntersectionPoint
-    beam_intersection_point: Optional[IntersectionPoint]
+    beam_intersection_point: IntersectionPoint | None
 
 
 @dataclass(slots=True)

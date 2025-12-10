@@ -217,13 +217,18 @@ class TestProfileDataCalculatorExtensions:
         )
 
     def test_calculate_all_with_angle_offset(self):
-        """Test full calculation with HPBW"""
+        """Test full calculation with HPBW
+
+        With the angle-based line creation fix, extreme height differences
+        can now be handled better. The upper intersection is now valid,
+        but cross intersections may still fail for very asymmetric cases.
+        """
         hca_indices = (50, 50)
         height_offsets = (Meters(2), Meters(40))  # User requested antenna heights
         angle_offset = Angle(2.5)  # User requested offset
 
         with pytest.raises(
-            ValueError, match="Upper intersection .* is outside path bounds"
+            ValueError, match=".* intersection .* is outside path bounds"
         ):
             self.calculator.calculate_all(hca_indices, height_offsets, angle_offset)
 

@@ -57,6 +57,7 @@ class BaseAnalysisService(ABC):
             wavelength=analyzer_result.wavelength,
             model_propagation_loss_parameters=model_params,
             result=result_data,
+            profile_data=analyzer_result.profile_data,
         )
 
     @abstractmethod

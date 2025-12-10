@@ -1,7 +1,12 @@
 """Constants used across the application."""
 
-# Output directory
-OUTPUT_DATA_DIR = "output_data"
+import os
+from pathlib import Path
+
+# Output directory - configurable via environment variable
+# Default: 'output_data' in current working directory
+# Best practice: Set OUTPUT_DATA_DIR in .env to absolute path in your project root
+OUTPUT_DATA_DIR = os.getenv("OUTPUT_DATA_DIR", str(Path.cwd() / "output_data"))
 
 # Physical constants
 EARTH_RADIUS_KM = 6371.0  # Earth's mean radius in kilometers

@@ -24,7 +24,7 @@ class SosnikAnalyzer(
         super().__init__(profile, input_data)
 
     def analyze(self, **kwargs: Any) -> AnalyzerResult:
-        trace_dist: Kilometers = self.distances[-1]
+        trace_distance_km: Kilometers = self.distances[-1]
         b_sum: Angle = self.hca_data.b_sum
 
         c = 299792458
@@ -34,23 +34,24 @@ class SosnikAnalyzer(
         arg = 1 + (
             b_sum
             * 60
-            / (0.4 * trace_dist + b_sum * 60)
-            * (1 + (b_sum * 60 / (0.2 * trace_dist)))
+            / (0.4 * trace_distance_km + b_sum * 60)
+            * (1 + (b_sum * 60 / (0.2 * trace_distance_km)))
         )
-        logger.debug(f"Argument {arg}")
+        logger.debug(f'Argument {arg}')
         if arg > 0:
             L_correction = Loss(-40 * math.log10(arg))
         else:
             L_correction = Loss(0)
         speed, extra_dist, equal_dist = self.calculate_speed(
-            trace_dist, L_correction, b_sum
+            trace_distance_km, L_correction, b_sum
         )
 
         model_parameters = {
-            "L_correction": L_correction,
-            "extra_dist": extra_dist,
-            "equal_dist": equal_dist,
-            "method": "sosnik",
+            'L_correction': L_correction,
+            'extra_distance_km': extra_dist,
+            'equal_dist': equal_dist,
+            'trace_distance_km': trace_distance_km,
+            'method': 'sosnik',
         }
 
         return AnalyzerResult(
@@ -59,5 +60,5 @@ class SosnikAnalyzer(
             wavelength=wavelength_m,
             hca=self.hca_data,
             profile_data=self.profile_data,
-            speed_prefix="k",
+            speed_prefix='k',
         )

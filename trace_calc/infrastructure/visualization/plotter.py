@@ -1,7 +1,6 @@
 """Profile visualization service (separated from analysis logic)"""
 
 import os
-from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -39,9 +38,9 @@ class ProfileVisualizer:
         self,
         path: PathData,
         profile: ProfileData,
-        result: Optional[AnalysisResult] = None,
+        result: AnalysisResult | None = None,
         show: bool = True,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
     ) -> None:
         """
         Generate and save a two-panel profile chart matching original style.
@@ -318,7 +317,8 @@ class ProfileVisualizer:
             site_b_elevation,  # Site B antenna position
             0,  # Sea level
         ]
-        y_min = min(all_y_values) - 0.1  # Add 100m margin below
+        lowest = min(all_y_values)
+        y_min = lowest - 0.1 if lowest < 0 else 0 # Add 100m margin if elevations are below sea level
         y_max = max(all_y_values) + 0.3  # Add 300m margin above
         axes[1].set_ylim(y_min, y_max)
 

@@ -3,7 +3,7 @@ import argparse
 from environs import Env
 import os
 
-from trace_calc.logging_config import setup_logging
+from trace_calc.logging_config import setup_logging, get_logger
 from trace_calc.application.analysis import (
     BaseAnalysisService,
     GrozaAnalysisService,
@@ -25,7 +25,10 @@ from trace_calc.infrastructure.output.formatters import (
     JSONOutputFormatter,
 )
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
+from trace_calc.application.services.user_input_parser import CoordinateParser
 from trace_calc.domain.exceptions import APIException
+
+logger = get_logger(__name__)
 
 
 class AppDependencies:
@@ -54,14 +57,21 @@ def get_analysis_service(method: str) -> BaseAnalysisService:
 
 
 class UserInputHandler:
-    def get_coordinates(self, prompt: str) -> Coordinates:
+    def get_coordinates(self, prompt: str) -> list[Coordinates]:
+        print(prompt)
+        lines = []
+        while True:
+            line = input()
+            if not line:
+                break
+            lines.append(line)
+
+        input_string = " ".join(lines)
+        parser = CoordinateParser()
         try:
-            lat, lon = map(float, input(prompt).split()[:2])
-            return Coordinates(lat=lat, lon=lon)
-        except ValueError:
-            raise ValueError(
-                "Coordinates must be in a valid numeric format (e.g., -123.456 12.345)"
-            )
+            return parser.parse(input_string)
+        except ValueError as e:
+            raise ValueError(f"Invalid coordinate format: {e}")
 
     def get_antenna_height(self, prompt: str) -> Meters | None:
         try:
@@ -162,16 +172,21 @@ async def main():
             input_data.site_b_coordinates = Coordinates(*path.coordinates[-1])
         except (FileNotFoundError, IndexError, ValueError):
             print("Coordinates are required for calculation. Enter them manually.")
-            input_data.site_a_coordinates = input_handler.get_coordinates(
-                'Input site "A" coordinates (format: -123.456 12.345): '
+            coords = input_handler.get_coordinates(
+                "Provide coordinates for sites A and B, then press Enter again to proceed: "
             )
-            input_data.site_b_coordinates = input_handler.get_coordinates(
-                'Input site "B" coordinates (format: -123.456 12.345): '
-            )
+            if len(coords) == 2:
+                input_data.site_a_coordinates, input_data.site_b_coordinates = coords
+            elif len(coords) == 1:
+                # This case might be useful if user enters one coordinate per line
+                # but for now we require all on one or more lines before empty line
+                raise ValueError("Both sets of coordinates are required.")
 
         profile_service = PathProfileService(
             input_data=input_data,
             elevations_api_client=deps.elevations_api_client,
+            block_size=256,
+            resolution=0.05,
         )
 
         if path is None:
@@ -187,13 +202,22 @@ async def main():
             visualizer=deps.visualizer,
         )
 
-        await run_analysis(orchestrator, input_data, path, args, deps)
+        try:
+            await run_analysis(orchestrator, input_data, path, args, deps)
+        except Exception as e:
+            logger.error(f"An error occurred during analysis: {e}")
+            if path is not None:
+                logger.warning(
+                    f"Deleting invalid stored path data: {input_data.path_name}"
+                )
+                await deps.storage.delete(input_data.path_name)
+            raise e
 
     except (ValueError, EOFError) as e:
         print(f"Error: {e}")
     except APIException as e:
         print(
-            f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the Geomagnetic Declination API."
+            f"API Error: {e}\nPlease ensure your API keys in the .env file are correct and have access to the APIs."
         )
 
 

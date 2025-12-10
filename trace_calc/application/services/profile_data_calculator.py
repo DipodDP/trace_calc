@@ -1,4 +1,3 @@
-from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 import dataclasses
@@ -111,7 +110,7 @@ class ProfileDataCalculator:
         antenna_elevation_angle_b: NDArray[np.float64],
         distances: NDArray[np.float64],
         elevations: NDArray[np.float64],
-    ) -> Optional[IntersectionPoint]:
+    ) -> IntersectionPoint | None:
         """
         Calculate the intersection point of the two antenna elevation angle lines.
         """
@@ -411,12 +410,40 @@ class ProfileDataCalculator:
         offset_start, offset_end = height_offsets
         coeff1, coeff2, _ = self.lines_of_sight(hca_indices, height_offsets)
 
-        # Calculate upper sight lines
+        # Calculate upper sight lines using angle-based approach
+        # Physical interpretation:
+        #   - Lower line = lower beam edge (clears horizon/HCA)
+        #   - Upper line = upper beam edge (lower + full HPBW)
+        #   - Beam center (antenna elevation) = lower + HPBW/2
         pivot_a = (self.distances[0], self.elevations_curved[0] + offset_start)
         pivot_b = (self.distances[-1], self.elevations_curved[-1] + offset_end)
 
-        coeff1_upper = self._calculate_upper_lines(coeff1, pivot_a, hpbw)
-        coeff2_upper = self._calculate_upper_lines(coeff2, pivot_b, hpbw)
+        # Get angles of lower sight lines
+        # For line A, slope is in m/km, positive means ascending left-to-right
+        angle_a_rad = np.arctan(coeff1[0] / 1000)
+        angle_a_deg = float(np.rad2deg(angle_a_rad))
+
+        # For line B, we need the angle from B's perspective (looking left/backward)
+        # The slope in the equation is for the mathematical line, but physically
+        # from B looking toward A, we flip the sign
+        angle_b_rad = np.arctan(-coeff2[0] / 1000)
+        angle_b_deg = float(np.rad2deg(angle_b_rad))
+
+        # Create upper lines at angles offset by +HPBW (full beamwidth)
+        # This represents the upper edge of the antenna beam
+        upper_angle_a = angle_a_deg + float(hpbw)
+        upper_angle_b = angle_b_deg + float(hpbw)
+
+        # For line A, create directly at the upper angle
+        coeff1_upper = geometry.create_line_at_angle(pivot_a, upper_angle_a)
+
+        # For line B, we need to create the line from B's perspective, then convert back
+        # The physical angle from B is upper_angle_b, but the slope in the equation
+        # needs to be negated because B is looking backward (from high x to low x)
+        k_upper_b_actual = np.tan(np.deg2rad(upper_angle_b))
+        k_upper_b = -k_upper_b_actual * 1000.0  # negate and convert to m/km
+        b_upper_b = pivot_b[1] - k_upper_b * pivot_b[0]
+        coeff2_upper = np.array([k_upper_b, b_upper_b])
 
         # Assemble sight lines data
         sight_lines_no_antenna_elevation_angle = SightLinesData(

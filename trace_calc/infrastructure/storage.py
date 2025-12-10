@@ -2,6 +2,8 @@ import aiofiles
 import numpy as np
 from numpy.typing import NDArray
 from pathlib import Path
+import os
+import asyncio
 
 from trace_calc.domain.models.path import PathData
 from trace_calc.domain.interfaces import BasePathStorage
@@ -34,3 +36,10 @@ class FilePathStorage(BasePathStorage):
 
         async with aiofiles.open(file_path, "wb") as f:
             await f.write(tmp.tobytes())
+
+    async def delete(self, filename: str) -> None:
+        file_path = self.output_dir / (filename + ".path")
+        try:
+            await asyncio.to_thread(os.remove, file_path)
+        except FileNotFoundError:
+            pass  # File doesn't exist, nothing to do

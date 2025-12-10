@@ -95,7 +95,7 @@ class GrozaAnalyzer(
         )
 
     def analyze(self, *, Lk: Loss = Loss(0.0), **kwargs: Any) -> AnalyzerResult:
-        trace_dist = self.distances[-1]
+        trace_distance_km = self.distances[-1]
 
         c = 299792458
         frequency_hz = self.input_data.frequency_mhz * 1e6
@@ -103,29 +103,30 @@ class GrozaAnalyzer(
 
         # calc losses
         Ld = 2
-        L0 = self._l0_calc(trace_dist, Meters(wavelength_m))
-        Lmed = self._lmed_calc(trace_dist, Meters(wavelength_m))
-        Lr = self._lr_calc(trace_dist, self._delta_calc())
+        L0 = self._l0_calc(trace_distance_km, Meters(wavelength_m))
+        Lmed = self._lmed_calc(trace_distance_km, Meters(wavelength_m))
+        Lr = self._lr_calc(trace_distance_km, self._delta_calc())
 
         Ltot, dL, speed = self.calculate_speed(L0, Lmed, Lr, Lk, Ld)
 
-        logger.debug(f"Total losses = {Ltot:.1f} dB")
-        logger.debug(f"Delta to reference trace = {dL:.1f} dB")
-        speed_prefix = "M"
+        logger.debug(f'Total losses = {Ltot:.1f} dB')
+        logger.debug(f'Delta to reference trace = {dL:.1f} dB')
+        speed_prefix = 'M'
         if speed < 1:
             speed_val = Speed(speed * 1024)
-            speed_prefix = "k"
+            speed_prefix = 'k'
         else:
             speed_val = speed
 
         model_parameters = {
-            "L0": L0,
-            "Lmed": Lmed,
-            "Ld": Ld,
-            "Lr": Lr,
-            "Ltot": Ltot,
-            "dL": dL,
-            "method": "groza",
+            'L0': L0,
+            'Lmed': Lmed,
+            'Ld': Ld,
+            'Lr': Lr,
+            'Ltot': Ltot,
+            'dL': dL,
+            'trace_distance_km': trace_distance_km,
+            'method': 'groza',
         }
 
         return AnalyzerResult(

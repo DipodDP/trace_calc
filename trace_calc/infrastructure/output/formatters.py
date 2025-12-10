@@ -2,7 +2,7 @@
 
 import json
 import numpy as np
-from typing import Protocol, Optional
+from typing import Protocol
 
 from trace_calc.domain.models.analysis import AnalysisResult
 from trace_calc.domain.models.coordinates import InputData
@@ -28,9 +28,9 @@ def _format_dict_floats(d, precision):
 
 def _build_output_dict(
     result: AnalysisResult,
-    input_data: Optional[InputData] = None,
-    geo_data: Optional[GeoData] = None,
-    profile_data: Optional[ProfileData] = None,
+    input_data: InputData | None = None,
+    geo_data: GeoData | None = None,
+    profile_data: ProfileData | None = None,
 ) -> dict:
     res_data = result.to_dict()
 
@@ -306,9 +306,9 @@ class OutputFormatter(Protocol):
     def format_result(
         self,
         result: AnalysisResult,
-        input_data: Optional[InputData] = None,
-        geo_data: Optional[GeoData] = None,
-        profile_data: Optional[ProfileData] = None,
+        input_data: InputData | None = None,
+        geo_data: GeoData | None = None,
+        profile_data: ProfileData | None = None,
     ) -> None:
         """Format and display analysis result with optional context"""
         ...
@@ -320,9 +320,9 @@ class ConsoleOutputFormatter:
     def format_result(
         self,
         result: AnalysisResult,
-        input_data: Optional[InputData] = None,
-        geo_data: Optional[GeoData] = None,
-        profile_data: Optional[ProfileData] = None,
+        input_data: InputData | None = None,
+        geo_data: GeoData | None = None,
+        profile_data: ProfileData | None = None,
     ) -> None:
         output_dict = _build_output_dict(result, input_data, geo_data, profile_data)
 
@@ -418,9 +418,9 @@ class JSONOutputFormatter:
     def format_result(
         self,
         result: AnalysisResult,
-        input_data: Optional[InputData] = None,
-        geo_data: Optional[GeoData] = None,
-        profile_data: Optional[ProfileData] = None,
+        input_data: InputData | None = None,
+        geo_data: GeoData | None = None,
+        profile_data: ProfileData | None = None,
     ) -> str:
         output_dict = _build_output_dict(result, input_data, geo_data, profile_data)
         return json.dumps(output_dict, indent=2)
