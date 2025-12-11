@@ -1,19 +1,19 @@
-# Troposcatter Trace Calculation and Advanced Link Analysis
+# Troposcatter Trace Calculation and Link Analysis
 
 ![Example Plot](output_data/example_plot.png)
 *Visualization of a common volume analysis, showing the terrain profile, sight lines, and key intersection points.*
 
 ## Overview
 
-**Package Name:** `trace-calc` (v0.3.22)
+**Package Name:** `trace-calc` (v0.3.23)
 
-This project provides an asynchronous command-line tool for calculating troposcatter radio link profiles, including terrain analysis and advanced common volume calculations. It helps in designing and evaluating communication links by providing detailed insights into propagation paths, signal interference areas, and geographical data.
+This project provides an asynchronous tool for calculating troposcatter radio link profiles, including terrain analysis and common sacatter volume calculations. It helps in designing and evaluating communication links by providing detailed insights into propagation paths, signal interference areas, and geographical data.
 
 The application runs asynchronously, allowing for efficient I/O operations (like API calls for elevation data) without blocking the main thread.
 
 **Designed for Extensibility and Integration:**
 
-This application is built for both standalone CLI use and integration as a Python package. It features a clean, extensible architecture based on Domain-Driven Design (DDD) principles, making it easy to:
+This application is built for both standalone CLI use and integration as a Python package. It features a clean, extensible architecture, making it easy to:
 - **Integrate into other applications** - Telegram bots, web services, automation tools, etc.
 - **Create custom propagation models** - Extend with your own calculation methods
 - **Implement alternative data sources** - Replace API clients with custom implementations
@@ -145,9 +145,18 @@ poetry add /path/to/trace_calc
 poetry add git+https://github.com/DipodDP/tgbot_troposcatter.git#subdirectory=trace_calc
 ```
 
-### Basic Programmatic Usage
+### Programmatic Usage: Two Approaches
 
-The easiest way to use the package is through the `TraceAnalyzerAPI`, which simplifies dependency setup and analysis calls.
+There are two main ways to use the package programmatically:
+
+1.  **High-Level Facade (`TraceAnalyzerAPI`)**: The recommended approach for most applications. It simplifies setup and analysis by handling dependency injection for you.
+2.  **Manual Dependency Injection**: For advanced use cases where you need full control over component setup, you can manually instantiate and wire together the services.
+
+The example below demonstrates the recommended **facade-based approach**. For an example of manual dependency injection, see **[examples/basic_integration.py](examples/basic_integration.py)**.
+
+### Example: Using the `TraceAnalyzerAPI` Facade
+
+This example shows how to use the `TraceAnalyzerAPI` to run an analysis with just a few lines of code.
 
 ```python
 import asyncio
@@ -155,58 +164,64 @@ from environs import Env
 from trace_calc import TraceAnalyzerAPI
 from trace_calc.infrastructure.storage import FilePathStorage
 from trace_calc.domain.constants import OUTPUT_DATA_DIR
+from trace_calc.domain.exceptions import APIException
 
-async def analyze_link():
-    # 1. Load environment variables from .env file
-    env = Env()
-    env.read_env()
+class AppConfig:
+    """A simple config object to hold API keys and URLs."""
+    def __init__(self, env: Env):
+        self.trace_calc = type('TraceCalcConfig', (object,), {
+            'elevation_api_url': env.str("ELEVATION_API_URL"),
+            'elevation_api_key': env.str("ELEVATION_API_KEY"),
+            'declination_api_url': env.str("DECLINATION_API_URL"),
+            'declination_api_key': env.str("DECLINATION_API_KEY"),
+        })()
 
-    # 2. Create the facade, which handles all dependency setup
-    #    (See "Extending with Custom Models" section for detailed dependency injection)
+async def analyze_link_with_facade():
+    """Analyzes a link using the high-level TraceAnalyzerAPI."""
+    try:
+        # 1. Load environment variables from .env file
+        env = Env()
+        env.read_env()
 
+        # 2. Create a configuration object
+        config = AppConfig(env)
 
-    class AppConfig:
-        def __init__(self, elevation_api_url, elevation_api_key, declination_api_url, declination_api_key):
-            self.trace_calc = type('TraceCalcConfig', (object,), {
-                'elevation_api_url': elevation_api_url,
-                'elevation_api_key': elevation_api_key,
-                'declination_api_url': declination_api_url,
-                'declination_api_key': declination_api_key,
-            })()
+        # 3. Initialize storage and create the facade
+        storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
+        analyzer_api = TraceAnalyzerAPI.create_from_config(config, storage)
 
-    config = AppConfig(
-        elevation_api_url=env.str("ELEVATION_API_URL"),
-        elevation_api_key=env.str("ELEVATION_API_KEY"),
-        declination_api_url=env.str("DECLINATION_API_URL"),
-        declination_api_key=env.str("DECLINATION_API_KEY")
-    )
-    storage = FilePathStorage(output_dir=OUTPUT_DATA_DIR)
-    analyzer_api = TraceAnalyzerAPI.create_from_config(config, storage)
+        # 4. Define path details
+        coord_a = [55.7558, 37.6173]  # Moscow
+        coord_b = [59.9343, 30.3351]  # St. Petersburg
+        path_filename = "my_path"
 
-    # 3. Define path details
-    coord_a = [55.7558, 37.6173]  # Moscow
-    coord_b = [59.9343, 30.3351]  # St. Petersburg
-    path_filename = "my_path"
+        # 5. Run analysis with a single method call
+        (
+            L0, Lmed, Lr, trace_dist, b1_max, b2_max,
+            b_sum, Ltot, dL, speed, sp_pref, result
+        ) = await analyzer_api.analyze_groza(
+            coord_a=coord_a,
+            coord_b=coord_b,
+            path_filename=path_filename,
+            antenna_a_height=30.0,
+            antenna_b_height=30.0,
+        )
 
-    # 4. Run analysis with a single method call
-    (
-        L0, Lmed, Lr, trace_dist, b1_max, b2_max,
-        b_sum, Ltot, dL, speed, sp_pref, result
-    ) = await analyzer_api.analyze_groza(
-        coord_a=coord_a,
-        coord_b=coord_b,
-        path_filename=path_filename,
-        antenna_a_height=30.0,
-        antenna_b_height=30.0,
-    )
+        # 6. Access and print results
+        print("--- Analysis Complete (Facade) ---")
+        print(f"Link Speed: {speed:.1f} {sp_pref}bps")
+        print(f"Total Loss: {Ltot:.2f} dB")
+        print(f"Distance: {trace_dist:.1f} km")
 
-    # 5. Access results
-    print(f"Link Speed: {speed:.1f} {sp_pref}bps")
-    print(f"Total Loss: {Ltot:.2f} dB")
-    print(f"Distance: {trace_dist:.1f} km")
+    except APIException as e:
+        print(f"API Error: {e}")
+        print("Please ensure your .env file is configured correctly with valid API keys.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 # Run the analysis
-asyncio.run(analyze_link())
+if __name__ == "__main__":
+    asyncio.run(analyze_link_with_facade())
 ```
 
 For more advanced use cases, such as injecting custom services or using lower-level components, see the files in the `/examples` directory.
@@ -215,12 +230,7 @@ For more advanced use cases, such as injecting custom services or using lower-le
 
 Results are returned as immutable dataclasses with `to_dict()` methods for JSON serialization.
 The `result` object returned by `analyze_groza` or `analyze_sosnik` is an `AnalysisResult` dataclass instance.
-
-```python
-# Assuming 'result' is the AnalysisResult object obtained from analyze_groza/sosnik
-
-# Access structured data directly from the AnalysisResult object
-geo_data_from_result = result.result.get('geo_data')
+```python # Assuming 'result' is the AnalysisResult object obtained from analyze_groza/sosnik # Access structured data directly from the AnalysisResult object geo_data_from_result = result.result.get('geo_data')
 profile_data_from_result = result.profile_data
 
 print(f"Geo Data: {geo_data_from_result}")
