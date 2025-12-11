@@ -73,3 +73,27 @@ def test_coordinate_parser_valid(parser, input_string, expected):
 def test_coordinate_parser_invalid(parser, input_string):
     with pytest.raises(ValueError):
         parser.parse(input_string)
+
+
+def test_parse_with_descriptive_text_and_multiple_points(parser):
+    input_text = """
+    Координаты точек: 
+
+    предложенная точка:
+    Широта: 63° 25' 38.80" С
+    Долгота: 80° 32' 5.39" В
+
+    Ярайнерское м.р. ДНС-1:
+    Широта: 63.145278° N
+    Долгота: 77.775833° E
+    """
+    coordinates = parser.parse(input_text)
+    assert len(coordinates) == 2
+    
+    # First coordinate
+    assert pytest.approx(coordinates[0].lat, abs=1e-6) == 63.42744444444444
+    assert pytest.approx(coordinates[0].lon, abs=1e-6) == 80.53483055555555
+    
+    # Second coordinate
+    assert pytest.approx(coordinates[1].lat, abs=1e-6) == 63.145278
+    assert pytest.approx(coordinates[1].lon, abs=1e-6) == 77.775833
