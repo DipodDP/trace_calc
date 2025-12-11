@@ -36,81 +36,84 @@ class CoordinateParser:
 
     def parse(self, text: str) -> list[Coordinates]:
         """
-        Parses a string of coordinates and returns a list of one or two Coordinates objects.
+        Parses a string of coordinates and returns a list of Coordinates objects.
+        The string can contain multiple coordinates on separate lines, with descriptive text.
         """
-        text = text.strip()
-        # Replace degree, minute, second symbols and semicolons with spaces
-        text = re.sub(r"""[°'"]""", " ", text)
-        text = re.sub(r";", " ", text)
+        all_coords = []
 
-        # Replace all commas with dots (assuming they are decimal separators after initial cleanup)
-        text = text.replace(",", ".")
-
-        text = re.sub(r"\s+", " ", text)
-        # Strip any leading non-numeric characters
-        text = re.sub(r"^[^0-9+-]+", "", text)
-
-        # Tokenize the string into numbers (now only with '.' as decimal) and hemisphere characters
-        tokens = re.findall(r"[+-]?\d+(?:\.\d+)?|[NSEWСВЮЗ]", text, re.IGNORECASE)
-
-        if not tokens:
-            raise ValueError("Invalid coordinate string: no values found.")
-
-        values = []
-        i = 0
-        while i < len(tokens):
-            is_dms = False
-            if (
-                i + 2 < len(tokens)
-                and self._is_number(tokens[i])
-                and self._is_number(tokens[i + 1])
-                and self._is_number(tokens[i + 2])
-            ):
-                d_str, m_str, s_str = tokens[i], tokens[i + 1], tokens[i + 2]
-
-                # If degrees or minutes part contains a decimal, it's not a DMS triplet.
-                if "." in d_str or "." in m_str:
-                    is_dms = False
-                else:
-                    d, m, s = float(d_str), float(m_str), float(s_str)
-                    if 0 <= m < 60 and 0 <= s < 60:
-                        is_dms = True
-
-            if is_dms:
-                d, m, s = float(tokens[i]), float(tokens[i + 1]), float(tokens[i + 2])
-                val = self._dms_to_dd(d, m, s)
-                i += 3
-                if i < len(tokens) and tokens[i].upper() in self.hemisphere_keys:
-                    if val >= 0:
-                        val *= self.hemisphere_multipliers.get(tokens[i].upper(), 1)
-                    i += 1
-                values.append(val)
+        lines = text.split("\n")
+        for line in lines:
+            line = line.strip()
+            if not line:
                 continue
 
-            # Fallback to parsing as a single decimal value
-            if self._is_number(tokens[i]):
-                val = float(tokens[i])
-                i += 1
-                if i < len(tokens) and tokens[i].upper() in self.hemisphere_keys:
-                    if val >= 0:
-                        val *= self.hemisphere_multipliers.get(tokens[i].upper(), 1)
-                    i += 1
-                values.append(val)
-            else:
-                # Not a number, just advance
-                i += 1
+            line = re.sub(r"""[°'"]""", " ", line)
+            line = line.replace(",", ".")
 
-        if len(values) not in [2, 4]:
-            raise ValueError(
-                f"Expected 2 or 4 coordinate values, but found {len(values)}."
+            tokens = re.findall(
+                r"[+-]?\d+(?:\.\d+)?|[NSEWСВЮЗ]|[^\s;]+", line, re.IGNORECASE
             )
 
-        if len(values) == 2:
-            return [Coordinates(lat=values[0], lon=values[1])]
-        return [
-            Coordinates(lat=values[0], lon=values[1]),
-            Coordinates(lat=values[2], lon=values[3]),
-        ]
+            i = 0
+            while i < len(tokens):
+                # Try to parse DMS: (d, m, s, [h])
+                if (
+                    i + 2 < len(tokens)
+                    and self._is_number(tokens[i])
+                    and self._is_number(tokens[i + 1])
+                    and self._is_number(tokens[i + 2])
+                ):
+                    d_str, m_str, s_str = tokens[i], tokens[i + 1], tokens[i + 2]
+                    if "." not in d_str and "." not in m_str:
+                        d, m, s = float(d_str), float(m_str), float(s_str)
+                        if not (0 <= m < 60 and 0 <= s < 60):
+                            raise ValueError(
+                                "Invalid DMS coordinate: minutes or seconds out of range"
+                            )
+
+                        val = self._dms_to_dd(d, m, s)
+                        i += 3
+                        if (
+                            i < len(tokens)
+                            and tokens[i].upper() in self.hemisphere_keys
+                        ):
+                            if val >= 0:
+                                val *= self.hemisphere_multipliers.get(
+                                    tokens[i].upper(), 1
+                                )
+                            i += 1
+                        all_coords.append(val)
+                        continue
+
+                # Try to parse DD: (d, [h])
+                if self._is_number(tokens[i]):
+                    val = float(tokens[i])
+                    i += 1
+                    if i < len(tokens) and tokens[i].upper() in self.hemisphere_keys:
+                        if val >= 0:
+                            val *= self.hemisphere_multipliers.get(tokens[i].upper(), 1)
+                        i += 1
+                    all_coords.append(val)
+                    continue
+
+                i += 1
+
+        if len(all_coords) % 2 != 0:
+            raise ValueError(
+                f"Found an odd number of coordinate values: {len(all_coords)}"
+            )
+
+        coords_list = []
+        for i in range(0, len(all_coords), 2):
+            coords_list.append(Coordinates(lat=all_coords[i], lon=all_coords[i + 1]))
+
+        if not coords_list:
+            if text.strip():
+                raise ValueError("No coordinates found in the input text.")
+            else:
+                raise ValueError("Input cannot be empty.")
+
+        return coords_list
 
     def parse_with_names(
         self,
@@ -135,8 +138,8 @@ class CoordinateParser:
             - coords_formatted: List of 4 formatted strings for display
         """
         # Parse site names
-        s_name = s_name.replace(',', ' ').replace(';', ' ')
-        site_names = [name for name in re.split(r'\s+', s_name) if name][:2]
+        s_name = s_name.replace(",", " ").replace(";", " ")
+        site_names = [name for name in re.split(r"\s+", s_name) if name][:2]
 
         # Default site names if not provided
         if not site_names:
