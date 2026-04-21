@@ -2,7 +2,11 @@ import asyncio
 import httpx
 from functools import wraps
 from trace_calc.logging_config import get_logger
-from trace_calc.domain.exceptions import APIException
+from trace_calc.domain.exceptions import (
+    APIException,
+    TransientAPIException,
+    RateLimitException,
+)
 
 logger = get_logger(__name__)
 
@@ -10,7 +14,7 @@ def async_retry(max_retries=5, backoff_factor=0.5, initial_timeout=10.0, max_tim
     """
     Decorator for retrying async functions with exponential backoff.
 
-    Handles network errors, timeouts, proxy errors, and API exceptions.
+    Handles network errors, timeouts, and specific retryable API exceptions.
     Increases timeout on each retry to handle slow connections.
     """
     def decorator(func):
@@ -27,7 +31,8 @@ def async_retry(max_retries=5, backoff_factor=0.5, initial_timeout=10.0, max_tim
 
                     return await func(*args, **kwargs)
                 except (
-                    APIException,
+                    TransientAPIException,
+                    RateLimitException,
                     httpx.TimeoutException,
                     httpx.ConnectTimeout,
                     httpx.ReadTimeout,
@@ -54,6 +59,10 @@ def async_retry(max_retries=5, backoff_factor=0.5, initial_timeout=10.0, max_tim
                             f"Last error: {error_type}: {e}"
                         )
                         raise e
+                except APIException as e:
+                    # Non-retryable: AuthenticationException, InvalidResponseException, plain APIException
+                    logger.error(f"Non-retryable {type(e).__name__} in {func.__name__}: {e}")
+                    raise
             # This part should not be reachable if max_retries > 0
             if last_exception:
                 raise last_exception

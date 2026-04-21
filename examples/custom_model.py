@@ -236,7 +236,7 @@ async def example_custom_model_usage():
     profile_service = PathProfileService(
         input_data=input_data,
         elevations_api_client=elevations_client,
-        block_size=256,
+        block_size=128,
         resolution=0.05,
     )
 

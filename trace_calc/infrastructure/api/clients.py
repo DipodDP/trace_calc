@@ -18,7 +18,13 @@ from trace_calc.domain.interfaces import (
     BaseDeclinationsApiClient,
     BaseElevationsApiClient,
 )
-from trace_calc.domain.exceptions import APIException
+from trace_calc.domain.exceptions import (
+    APIException,
+    RateLimitException,
+    AuthenticationException,
+    TransientAPIException,
+    InvalidResponseException,
+)
 
 from .decorators import async_retry
 from trace_calc.logging_config import get_logger
@@ -34,27 +40,31 @@ class SyncElevationsApiClient(BaseElevationsApiClient):
             "X-RapidAPI-Host": self.api_url.split("/")[2],  # Getting host from API URL
             "X-RapidAPI-Key": self.api_key,
         }
-        querystring = {"points": "["}
-
-        for coord in coord_vect_block:
-            querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
-        querystring["points"] = querystring["points"][:-1] + "]"
+        points_str = "[" + ",".join([f"[{coord[0]:.6f},{coord[1]:.6f}]" for coord in coord_vect_block]) + "]"
+        querystring = {"points": points_str}
 
         logger.info("------- Start fetching block of elevations -------")
-        logger.debug(f"Query string: {querystring['points'][:80]}...")
+        logger.debug(f"Query string: {points_str[:80]}...")
         response = requests.request(
             "GET", self.api_url, headers=headers, params=querystring
         )
         logger.info(f"------- Got response ------- {response.status_code}")
 
         try:
-            resp = json.loads(response.text)
+            resp = response.json()
         except json.JSONDecodeError:
             resp = {"message": response.text}
 
+        if response.status_code == 429:
+            raise RateLimitException(f"Rate limit exceeded: {response.text}")
+        if response.status_code in [401, 403]:
+            raise AuthenticationException(f"Authentication failed: {response.text}")
+        if response.status_code >= 500:
+            raise TransientAPIException(f"Server error {response.status_code}: {response.text}")
+
         if response.status_code not in [200, 301, 302] or not isinstance(resp, list):
             raise APIException(
-                f"{response.status_code} - {': '.join(list(resp.values()))}"
+                f"{response.status_code} - {resp.get('message', response.text) if isinstance(resp, dict) else response.text}"
             )
 
         return [Elevation(e) for e in resp]
@@ -97,32 +107,50 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             "X-RapidAPI-Key": self.api_key,
         }
 
-        querystring = {"points": "["}
-        for coord in coord_vect_block:
-            querystring["points"] += f"[{coord[0]:.6f},{coord[1]:.6f}],"
-        querystring["points"] = querystring["points"][:-1] + "]"
+        points_str = "[" + ",".join([f"[{coord[0]:.6f},{coord[1]:.6f}]" for coord in coord_vect_block]) + "]"
 
         timeout = kwargs.get("timeout", 10.0)
         # Configure timeout with connect and read timeouts
         timeout_config = Timeout(timeout, connect=5.0)
 
         async with AsyncClient(timeout=timeout_config, follow_redirects=True) as client:
-            request = client.build_request("GET", self.api_url, params=querystring, headers=headers)
-            logger.info(f"HTTP Request: {request.method} {request.url}")
+            request = client.build_request("GET", self.api_url, params={"points": points_str}, headers=headers)
+            url_str = str(request.url)
+            logger.info(f"HTTP Request: {request.method} {url_str[:120]}...")
             response = await client.send(request)
             logger.info(f"HTTP Response: {response.status_code}")
 
             if not response.is_success:
+                error_msg = response.text
                 try:
                     error_data = response.json()
+                    if isinstance(error_data, dict):
+                        error_msg = error_data.get("message", error_msg)
                 except json.JSONDecodeError:
-                    error_data = {"message": response.text}
+                    pass
 
-                raise APIException(
-                    f"{response.status_code} - {': '.join(error_data.values())}"
-                )
+                if response.status_code == 429:
+                    raise RateLimitException(f"Rate limit exceeded: {error_msg}")
+                if response.status_code in [401, 403]:
+                    raise AuthenticationException(f"Authentication failed: {error_msg}")
+                if response.status_code == 414:
+                    raise InvalidResponseException(
+                        f"414 Request-URI Too Large. Try reducing block_size. URL length: {len(url_str)}"
+                    )
+                if response.status_code >= 500:
+                    raise TransientAPIException(f"Server error {response.status_code}: {error_msg}")
 
-            return [Elevation(e) for e in response.json()]
+                raise APIException(f"{response.status_code} - {error_msg}")
+
+            try:
+                data = response.json()
+                if not isinstance(data, list):
+                    raise InvalidResponseException(
+                        f"Expected list of elevations, got {type(data).__name__}"
+                    )
+                return [Elevation(e) for e in data]
+            except json.JSONDecodeError:
+                raise InvalidResponseException(f"Malformed JSON response: {response.text[:100]}")
 
     async def fetch_elevations(
         self, coord_vect: NDArray[np.floating[Any]], block_size: int
@@ -138,9 +166,10 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             return np.array([], dtype=np.float64)
 
         blocks_num = (coord_vect.shape[0] + block_size - 1) // block_size
+        MAX_CONCURRENT = 4
 
         logger.info(
-            f"Retrieving elevation data for {coord_vect.shape[0]} coordinates in {blocks_num} blocks..."
+            f"Retrieving elevation data for {coord_vect.shape[0]} coordinates in {blocks_num} blocks (max {MAX_CONCURRENT} concurrent)..."
         )
         coord_vect_blocks = [
             coord_vect[n * block_size : (n + 1) * block_size] for n in range(blocks_num)
@@ -149,8 +178,14 @@ class AsyncElevationsApiClient(BaseElevationsApiClient):
             f"Created {len(coord_vect_blocks)} block(s) with shapes: {[block.shape for block in coord_vect_blocks]}"
         )
 
-        tasks = [self.elevations_api_request(block) for block in coord_vect_blocks]
-        logger.debug(f"Created {len(tasks)} task(s) for async execution")
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+        async def fetch_with_limit(block):
+            async with semaphore:
+                return await self.elevations_api_request(block)
+
+        tasks = [fetch_with_limit(block) for block in coord_vect_blocks]
+        logger.debug(f"Created {len(tasks)} task(s) for async execution with concurrency limit of {MAX_CONCURRENT}")
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         successes: list[list[Elevation] | None] = [None] * blocks_num
@@ -232,14 +267,22 @@ class AsyncMagDeclinationApiClient(BaseDeclinationsApiClient):
             logger.info(f"HTTP Response: {response.status_code}")
 
             if not response.is_success:
+                error_msg = response.text
                 try:
                     error_data = response.json()
+                    if isinstance(error_data, dict):
+                        error_msg = error_data.get("message", error_msg)
                 except json.JSONDecodeError:
-                    error_data = {"message": response.text}
+                    pass
 
-                raise APIException(
-                    f"{response.status_code} - {': '.join(error_data.values())}"
-                )
+                if response.status_code == 429:
+                    raise RateLimitException(f"Rate limit exceeded: {error_msg}")
+                if response.status_code in [401, 403]:
+                    raise AuthenticationException(f"Authentication failed: {error_msg}")
+                if response.status_code >= 500:
+                    raise TransientAPIException(f"Server error {response.status_code}: {error_msg}")
+
+                raise APIException(f"{response.status_code} - {error_msg}")
 
             return await self._parse_xml(response)
 

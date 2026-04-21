@@ -9,7 +9,7 @@ import httpx # Import httpx
 from trace_calc.domain.models.coordinates import Coordinates, InputData
 from trace_calc.infrastructure.api.clients import AsyncElevationsApiClient, AsyncMagDeclinationApiClient
 from trace_calc.application.services.profile import PathProfileService
-from trace_calc.domain.exceptions import APIException
+from trace_calc.domain.exceptions import APIException, RateLimitException, AuthenticationException, TransientAPIException, InvalidResponseException
 
 
 @pytest.fixture
@@ -63,19 +63,19 @@ class ApiRequestTracker:
 
 
 @pytest.mark.asyncio
-async def test_api_request_count_with_256_block_size(sample_input_data, elevations_api_client):
-    """Test that correct number of API requests are made with block_size=256"""
+async def test_api_request_count_with_128_block_size(sample_input_data, elevations_api_client):
+    """Test that correct number of API requests are made with block_size=128"""
     # Create tracker
     tracker = ApiRequestTracker()
 
     # Patch the API request method
     elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
-    # Create profile service with block_size=256
+    # Create profile service with block_size=128
     profile_service = PathProfileService(
         input_data=sample_input_data,
         elevations_api_client=elevations_api_client,
-        block_size=256,
+        block_size=128,
         resolution=0.5,
     )
 
@@ -84,11 +84,11 @@ async def test_api_request_count_with_256_block_size(sample_input_data, elevatio
     total_coords = coord_vect.shape[0]
 
     # Fetch elevations
-    elevations = await elevations_api_client.fetch_elevations(coord_vect, block_size=256)
+    elevations = await elevations_api_client.fetch_elevations(coord_vect, block_size=128)
 
     # Calculate expected number of blocks
-    expected_blocks = total_coords // 256
-    if total_coords % 256 != 0:
+    expected_blocks = total_coords // 128
+    if total_coords % 128 != 0:
         expected_blocks += 1
 
     # Verify results
@@ -109,7 +109,7 @@ async def test_api_request_block_sizes(sample_input_data, elevations_api_client)
     tracker = ApiRequestTracker()
     elevations_api_client.elevations_api_request = tracker.create_tracked_method()
 
-    block_size = 256
+    block_size = 128
     profile_service = PathProfileService(
         input_data=sample_input_data,
         elevations_api_client=elevations_api_client,
@@ -139,11 +139,11 @@ async def test_api_request_block_sizes(sample_input_data, elevations_api_client)
 @pytest.mark.parametrize(
     "block_size,resolution",
     [
+        (64, 0.5),
         (128, 0.5),
         (256, 0.5),
-        (512, 0.5),
-        (256, 1.0),
-        (256, 0.25),
+        (128, 1.0),
+        (128, 0.25),
     ],
 )
 async def test_api_requests_with_different_parameters(
@@ -183,12 +183,12 @@ async def test_api_request_coordinate_continuity(sample_input_data, elevations_a
     profile_service = PathProfileService(
         input_data=sample_input_data,
         elevations_api_client=elevations_api_client,
-        block_size=256,
+        block_size=128,
         resolution=0.5,
     )
 
     coord_vect = profile_service.linspace_coord()
-    await elevations_api_client.fetch_elevations(coord_vect, block_size=256)
+    await elevations_api_client.fetch_elevations(coord_vect, block_size=128)
 
     # Verify first block starts with first coordinate
     assert np.allclose(tracker.call_coordinates[0]["first"], coord_vect[0]), (
@@ -256,25 +256,25 @@ async def test_single_block_request(elevations_api_client):
 
 @pytest.mark.asyncio
 async def test_mag_declination_api_client_invalid_key_raises_exception(mag_declination_api_client):
-    """Test that AsyncMagDeclinationApiClient raises APIException for invalid key."""
+    """Test that AsyncMagDeclinationApiClient raises APIException for invalid key without retrying."""
     mock_response = MagicMock()
     mock_response.is_success = False
     mock_response.status_code = 400
     mock_response.json.return_value = {"message": "Bad request. Either the key parameter is missing or it is wrong."}
     mock_response.text = "Bad request. Either the key parameter is missing or it is wrong."
-    mock_response.request = MagicMock() # Mock the request attribute
+    mock_response.request = MagicMock()
     mock_response.request.url = "http://mockurl.com"
 
-    # The decorator will retry, so we need to mock the response for each attempt
-    with patch("httpx.AsyncClient.send", AsyncMock(return_value=mock_response)):
+    with patch("httpx.AsyncClient.send", AsyncMock(return_value=mock_response)) as mock_send:
         dummy_coords = [Coordinates(lat=0.0, lon=0.0)]
 
         with pytest.raises(APIException) as excinfo:
             await mag_declination_api_client.fetch_declinations(dummy_coords)
 
-        # The retry decorator wraps the exception. We need to check inside.
-        assert isinstance(excinfo.value.args[0][0][1], APIException)
-        assert "400 - Bad request. Either the key parameter is missing or it is wrong." in str(excinfo.value.args[0][0][1])
+        # Non-retryable: decorator fast-fails, exception propagates directly (not wrapped in list)
+        assert "400 - Bad request. Either the key parameter is missing or it is wrong." in str(excinfo.value)
+        # Should have been called exactly once — no retries
+        assert mock_send.call_count == 1
 
 
 @pytest.mark.asyncio

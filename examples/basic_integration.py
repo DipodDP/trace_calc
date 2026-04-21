@@ -103,7 +103,7 @@ async def run_troposcatter_analysis(
     profile_service = PathProfileService(
         input_data=input_data,
         elevations_api_client=elevations_client,
-        block_size=256,  # Fetch elevations in blocks of 256 points
+        block_size=128,  # Fetch elevations in blocks of 128 points
         resolution=0.05,  # 0.05 km resolution between points
     )
 
