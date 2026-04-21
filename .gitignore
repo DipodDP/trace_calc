@@ -68,3 +68,8 @@ venv.bak/
 *.path
 *.png
 *.json
+
+# logs and Windows Zone.Identifier
+*.log
+*.gz
+*:Zone.Identifier
