@@ -48,7 +48,10 @@ class CoordinateParser:
                 continue
 
             line = re.sub(r"""[°'"]""", " ", line)
-            line = line.replace(",", ".")
+            # Replace commas used as decimal separators (digit,digit → digit.digit)
+            line = re.sub(r"(\d),(\d)", r"\1.\2", line)
+            # Treat remaining commas as whitespace separators
+            line = line.replace(",", " ")
 
             tokens = re.findall(
                 r"[+-]?\d+(?:\.\d+)?|[NSEWСВЮЗ]|[^\s;]+", line, re.IGNORECASE
@@ -100,7 +103,7 @@ class CoordinateParser:
 
         if len(all_coords) % 2 != 0:
             raise ValueError(
-                f"Found an odd number of coordinate values: {len(all_coords)}"
+                f"Expected 2 or 4 coordinate values, got {len(all_coords)}"
             )
 
         coords_list = []
@@ -108,10 +111,7 @@ class CoordinateParser:
             coords_list.append(Coordinates(lat=all_coords[i], lon=all_coords[i + 1]))
 
         if not coords_list:
-            if text.strip():
-                raise ValueError("No coordinates found in the input text.")
-            else:
-                raise ValueError("Input cannot be empty.")
+            raise ValueError("no values found in the input text")
 
         return coords_list
 
