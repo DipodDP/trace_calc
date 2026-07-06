@@ -12,6 +12,7 @@ from trace_calc.domain.models.path import GeoData, PathData
 from trace_calc.application.services.coordinates import CoordinatesService
 from trace_calc.domain.interfaces import BaseDeclinationsApiClient
 from trace_calc.domain.models.units import Angle, Degrees, Kilometers
+from trace_calc.infrastructure.i18n import t
 
 
 class OrchestrationService:
@@ -151,7 +152,7 @@ class GeoDataService:
         """
 
         if not self.declinations_api_client:
-            raise RuntimeError("Declinations API client is missing!")
+            raise RuntimeError(t("declination_client_missing"))
 
         mag_declinations: list[
             Angle

@@ -1,5 +1,6 @@
 import re
 from trace_calc.domain.models.coordinates import Coordinates
+from trace_calc.infrastructure.i18n import t
 
 
 class CoordinateParser:
@@ -70,9 +71,7 @@ class CoordinateParser:
                     if "." not in d_str and "." not in m_str:
                         d, m, s = float(d_str), float(m_str), float(s_str)
                         if not (0 <= m < 60 and 0 <= s < 60):
-                            raise ValueError(
-                                "Invalid DMS coordinate: minutes or seconds out of range"
-                            )
+                            raise ValueError(t("dms_out_of_range"))
 
                         val = self._dms_to_dd(d, m, s)
                         i += 3
@@ -102,16 +101,14 @@ class CoordinateParser:
                 i += 1
 
         if len(all_coords) % 2 != 0:
-            raise ValueError(
-                f"Expected 2 or 4 coordinate values, got {len(all_coords)}"
-            )
+            raise ValueError(t("expected_2_or_4_values", len(all_coords)))
 
         coords_list = []
         for i in range(0, len(all_coords), 2):
             coords_list.append(Coordinates(lat=all_coords[i], lon=all_coords[i + 1]))
 
         if not coords_list:
-            raise ValueError("no values found in the input text")
+            raise ValueError(t("no_values_found"))
 
         return coords_list
 
@@ -151,10 +148,7 @@ class CoordinateParser:
         coordinates_list = self.parse(coords)
 
         if len(coordinates_list) != 2:
-            raise ValueError(
-                f"Expected 2 coordinate pairs, got {len(coordinates_list)}. "
-                f"Please provide coordinates for both sites."
-            )
+            raise ValueError(t("expected_2_pairs", len(coordinates_list)))
 
         # Extract to decimal list format [lat1, lon1, lat2, lon2]
         coords_decimal = [

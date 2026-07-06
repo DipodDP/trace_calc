@@ -7,6 +7,7 @@ import numpy as np
 from trace_calc.domain.curvature import calculate_earth_drop
 from trace_calc.domain.models.path import PathData, ProfileData
 from trace_calc.domain.models.analysis import AnalysisResult
+from trace_calc.infrastructure.i18n import t
 
 
 class ProfileVisualizer:
@@ -65,12 +66,12 @@ class ProfileVisualizer:
             profile.plain.elevations,
             profile.plain.baseline,
         )
-        axes[0].plot(distances, elevations, "k-", linewidth=1.0, label="Terrain")
+        axes[0].plot(distances, elevations, "k-", linewidth=1.0, label=t("terrain"))
         axes[0].fill_between(distances, elevations, zero, facecolor="g", alpha=0.2)
         axes[0].grid(True)
-        axes[0].set_title("Plain Elevation Profile", fontsize=12, fontweight="bold")
-        axes[0].set_xlabel("Distance (km)", fontsize=10)
-        axes[0].set_ylabel("Elevation (m)", fontsize=10)
+        axes[0].set_title(t("plain_elevation_profile"), fontsize=12, fontweight="bold")
+        axes[0].set_xlabel(t("distance_km"), fontsize=10)
+        axes[0].set_ylabel(t("elevation_m"), fontsize=10)
 
         elevations_range = elevations.max() - elevations.min()
         axes[0].set_xlim(distances[0], distances[-1])
@@ -90,7 +91,7 @@ class ProfileVisualizer:
 
         # Plot curved elevation with fill
         axes[1].plot(
-            distances, elevations_curved, "k-", linewidth=1.0, label="Terrain (curved)"
+            distances, elevations_curved, "k-", linewidth=1.0, label=t("terrain_curved")
         )
         axes[1].fill_between(
             distances,
@@ -109,7 +110,7 @@ class ProfileVisualizer:
             color="C1",
             linestyle="-",
             lw=2.0,
-            label="Lower sight line A",
+            label=t("lower_sight_line_a"),
         )
         axes[1].plot(
             distances,
@@ -117,7 +118,7 @@ class ProfileVisualizer:
             color="C0",
             linestyle="-",
             lw=2.0,
-            label="Lower sight line B",
+            label=t("lower_sight_line_b"),
         )
 
         # Plot upper sight lines (same colors as lower, but dashed)
@@ -130,7 +131,7 @@ class ProfileVisualizer:
             linestyle="--",
             lw=2.0,
             alpha=0.8,
-            label="Upper sight line A",
+            label=t("upper_sight_line_a"),
         )
         axes[1].plot(
             distances,
@@ -139,7 +140,7 @@ class ProfileVisualizer:
             linestyle="--",
             lw=2.0,
             alpha=0.8,
-            label="Upper sight line B",
+            label=t("upper_sight_line_b"),
         )
 
         # Plot antenna elevation angle lines
@@ -150,7 +151,7 @@ class ProfileVisualizer:
             linestyle=":",
             lw=1.5,
             alpha=0.9,
-            label="Antenna Elevation Angle A",
+            label=t("antenna_elev_a"),
         )
         axes[1].plot(
             distances,
@@ -159,7 +160,7 @@ class ProfileVisualizer:
             linestyle=":",
             lw=1.5,
             alpha=0.9,
-            label="Antenna Elevation Angle B",
+            label=t("antenna_elev_b"),
         )
 
         # Plot intersection points (using colors with good grayscale contrast)
@@ -194,7 +195,7 @@ class ProfileVisualizer:
             c="darkgreen",
             s=120,
             marker="o",
-            label="Lower intersection",
+            label=t("lower_intersection_label"),
             edgecolors="black",
             linewidths=1.5,
             zorder=5,
@@ -205,7 +206,7 @@ class ProfileVisualizer:
             c="darkred",
             s=120,
             marker="o",
-            label="Upper intersection",
+            label=t("upper_intersection_label"),
             edgecolors="black",
             linewidths=1.5,
             zorder=5,
@@ -216,7 +217,7 @@ class ProfileVisualizer:
             c="goldenrod",
             s=100,
             marker="^",
-            label="Cross AB (Upper A × Lower B)",
+            label=t("cross_ab_label"),
             edgecolors="black",
             linewidths=1.5,
             zorder=5,
@@ -227,7 +228,7 @@ class ProfileVisualizer:
             c="indigo",
             s=100,
             marker="v",
-            label="Cross BA (Upper B × Lower A)",
+            label=t("cross_ba_label"),
             edgecolors="black",
             linewidths=1.5,
             zorder=5,
@@ -248,7 +249,7 @@ class ProfileVisualizer:
                 c="blue",
                 s=150,
                 marker="X",
-                label="Beam Intersection Point",
+                label=t("beam_intersection_label"),
                 edgecolors="black",
                 linewidths=1.5,
                 zorder=6,
@@ -256,12 +257,12 @@ class ProfileVisualizer:
 
         axes[1].grid(True)
         axes[1].set_title(
-            "Curved Profile with Common Scatter Volume Analysis",
+            t("curved_profile_title"),
             fontsize=12,
             fontweight="bold",
         )
-        axes[1].set_xlabel("Distance (km)", fontsize=10)
-        axes[1].set_ylabel("Elevation (km)", fontsize=10)
+        axes[1].set_xlabel(t("distance_km"), fontsize=10)
+        axes[1].set_ylabel(t("elevation_km"), fontsize=10)
         axes[1].legend(loc="upper right", fontsize=8, ncol=2)
 
         # Add volume metrics text box
@@ -269,16 +270,17 @@ class ProfileVisualizer:
             profile.intersections.upper.elevation_sea_level
             - profile.intersections.lower.elevation_sea_level
         )
-        metrics_text = (
-            f"Common scatter volume: {profile.volume.cone_intersection_volume_m3 / 1e9:.2f} km³\n"
-            f"Distance A→Cross AB: {profile.volume.distance_a_to_cross_ab:.2f} km\n"
-            f"Distance B→Cross BA: {profile.volume.distance_b_to_cross_ba:.2f} km\n"
-            f"Distance between crosses: {profile.volume.distance_between_crosses:.2f} km\n"
-            f"Top above terrain: {profile.intersections.upper.elevation_terrain / 1000:.2f} km ("
-            f"ASL: {profile.intersections.upper.elevation_sea_level / 1000:.2f} km)\n"
-            f"Bottom above terrain: {profile.intersections.lower.elevation_terrain / 1000:.2f} km ("
-            f"ASL: {profile.intersections.lower.elevation_sea_level / 1000:.2f} km)\n"
-            f"Height: {height_between_intersections / 1000:.2f} km"
+        metrics_text = t(
+            "common_volume_metric_text",
+            profile.volume.cone_intersection_volume_m3 / 1e9,
+            profile.volume.distance_a_to_cross_ab,
+            profile.volume.distance_b_to_cross_ba,
+            profile.volume.distance_between_crosses,
+            profile.intersections.upper.elevation_terrain / 1000,
+            profile.intersections.upper.elevation_sea_level / 1000,
+            profile.intersections.lower.elevation_terrain / 1000,
+            profile.intersections.lower.elevation_sea_level / 1000,
+            height_between_intersections / 1000,
         )
         if result:
             hca_b1_max = result.result.get("b1_max", 0.0)
@@ -287,10 +289,16 @@ class ProfileVisualizer:
             hpbw_value = result.result.get("hpbw", 0.0)
 
             # HCA is Horizon Close Angle, BIA is Beam Intersection Angle, Θ is Beamwidgth (HPBW)"
-            metrics_text += (
-                f"\nSite A: HCA={hca_b1_max:.2f}°, Elev={profile.volume.antenna_elevation_angle_a:.2f}°, Θ={hpbw_value:.2f}°\n"
-                f"Site B: HCA={hca_b2_max:.2f}°, Elev={profile.volume.antenna_elevation_angle_b:.2f}°, Θ={hpbw_value:.2f}°\n"
-                                        f"HCA sum: {hca_b_sum:.2f}°, BIA: {intersections.beam_intersection_point.angle:.2f}°"
+            metrics_text += t(
+                "hca_metrics_text",
+                hca_b1_max,
+                profile.volume.antenna_elevation_angle_a,
+                hpbw_value,
+                hca_b2_max,
+                profile.volume.antenna_elevation_angle_b,
+                hpbw_value,
+                hca_b_sum,
+                intersections.beam_intersection_point.angle if intersections.beam_intersection_point else 0.0,
             )
         axes[1].text(
             0.02,

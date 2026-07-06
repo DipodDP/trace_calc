@@ -8,6 +8,7 @@ from trace_calc.domain.models.analysis import AnalysisResult
 from trace_calc.domain.models.coordinates import InputData
 from trace_calc.domain.models.path import GeoData, ProfileData
 from trace_calc.application.services.coordinates import CoordinatesService
+from trace_calc.infrastructure.i18n import t
 
 
 def _format_dict_floats(d, precision):
@@ -190,112 +191,91 @@ def format_common_volume_results(profile: ProfileData) -> str:
     common_volume = profile.volume  # Changed from 'volume' to 'common_volume'
 
     output = []
-    output.append("\n=== Common Scatter Volume Analysis ===")
+    output.append(t("common_volume_analysis_title"))
 
     # Lower sight lines
-    output.append("\nLower Sight Lines:")
+    output.append(t("lower_sight_lines"))
     angle_a = np.degrees(np.arctan(sight_lines.lower_a[0] / 1000))
     angle_b = np.degrees(np.arctan(-sight_lines.lower_b[0] / 1000))
-    output.append(
-        f"  Site A -> Obstacle: slope={sight_lines.lower_a[0]:.4f}, "
-        f"angle={angle_a:.2f}°"
-    )
-    output.append(
-        f"  Site B -> Obstacle: slope={-sight_lines.lower_b[0]:.4f}, "
-        f"angle={angle_b:.2f}°"
-    )
+    output.append(t("site_a_obstacle", sight_lines.lower_a[0], angle_a))
+    output.append(t("site_b_obstacle", -sight_lines.lower_b[0], angle_b))
 
     # Upper sight lines
-    output.append("\nUpper Sight Lines:")
+    output.append(t("upper_sight_lines"))
     angle_upper_a = np.degrees(np.arctan(sight_lines.upper_a[0] / 1000))
     angle_upper_b = np.degrees(np.arctan(-sight_lines.upper_b[0] / 1000))
-    output.append(
-        f"  Site A (upper): slope={sight_lines.upper_a[0]:.4f}, "
-        f"angle={angle_upper_a:.2f}°"
-    )
-    output.append(
-        f"  Site B (upper): slope={-sight_lines.upper_b[0]:.4f}, "
-        f"angle={angle_upper_b:.2f}°"
-    )
+    output.append(t("site_a_upper", sight_lines.upper_a[0], angle_upper_a))
+    output.append(t("site_b_upper", -sight_lines.upper_b[0], angle_upper_b))
 
     # Beam Intersection Point
     if intersections.beam_intersection_point:
-        output.append("\nBeam Intersection Point:")
+        output.append(t("beam_intersection_point"))
         output.append(
-            f"  Distance: {intersections.beam_intersection_point.distance_km:.2f} km, "
-            f"Elevation ASL: {intersections.beam_intersection_point.elevation_sea_level / 1000:.2f} km, "
-            f"Elevation above terrain: {intersections.beam_intersection_point.elevation_terrain / 1000:.2f} km, "
-            f"Intersection angle: {intersections.beam_intersection_point.angle:.2f}°"
-            if intersections.beam_intersection_point.angle is not None
-            else "N/A"
+            t(
+                "beam_intersection_details",
+                intersections.beam_intersection_point.distance_km,
+                intersections.beam_intersection_point.elevation_sea_level / 1000,
+                intersections.beam_intersection_point.elevation_terrain / 1000,
+                intersections.beam_intersection_point.angle or 0.0,
+            )
         )
     else:
-        output.append("\nBeam Intersection Point: Not found within path.")
+        output.append(t("beam_intersection_not_found"))
 
     # Antenna Elevation Angles
-    output.append("\nAntenna Elevation Angles:")
-    output.append(
-        f"  Antenna Elevation Angle A: {common_volume.antenna_elevation_angle_a:.2f}°"
-    )
-    output.append(
-        f"  Antenna Elevation Angle B: {common_volume.antenna_elevation_angle_b:.2f}°"
-    )
+    output.append(t("antenna_elevation_angles"))
+    output.append(t("antenna_elevation_angle_a", common_volume.antenna_elevation_angle_a))
+    output.append(t("antenna_elevation_angle_b", common_volume.antenna_elevation_angle_b))
 
     # Cross intersections
-    output.append("\nCross Intersections:")
+    output.append(t("cross_intersections"))
     output.append(
-        f"  Upper A x Lower B: {intersections.cross_ab.distance_km:.2f} km, "
-        f"{intersections.cross_ab.elevation_sea_level / 1000:.2f} km ASL, "
-        f"{intersections.cross_ab.elevation_terrain / 1000:.2f} km above terrain"
+        t(
+            "upper_a_lower_b",
+            intersections.cross_ab.distance_km,
+            intersections.cross_ab.elevation_sea_level / 1000,
+            intersections.cross_ab.elevation_terrain / 1000,
+        )
     )
     output.append(
-        f"  Upper B x Lower A: {intersections.cross_ba.distance_km:.2f} km, "
-        f"{intersections.cross_ba.elevation_sea_level / 1000:.2f} km ASL, "
-        f"{intersections.cross_ba.elevation_terrain / 1000:.2f} km above terrain"
+        t(
+            "upper_b_lower_a",
+            intersections.cross_ba.distance_km,
+            intersections.cross_ba.elevation_sea_level / 1000,
+            intersections.cross_ba.elevation_terrain / 1000,
+        )
     )
 
     # Common Volume metrics
-    output.append("\nCommon Volume Metrics:")
+    output.append(t("common_volume_metrics"))
+    output.append(t("common_scatter_volume", common_volume.cone_intersection_volume_m3 / 1e9))
+    output.append(t("dist_a_cross_ab", common_volume.distance_a_to_cross_ab))
+    output.append(t("dist_b_cross_ba", common_volume.distance_b_to_cross_ba))
+    output.append(t("dist_between_crosses", common_volume.distance_between_crosses))
     output.append(
-        f"  Common scatter volume: {common_volume.cone_intersection_volume_m3 / 1e9:.2f} km³"
+        t(
+            "common_volume_top",
+            intersections.upper.distance_km,
+            intersections.upper.elevation_terrain / 1000,
+            intersections.upper.elevation_sea_level / 1000,
+        )
     )
     output.append(
-        f"  Distance from A to Upper A x Lower B: {common_volume.distance_a_to_cross_ab:.2f} km"
-    )
-    output.append(
-        f"  Distance from B to Upper B x Lower A: {common_volume.distance_b_to_cross_ba:.2f} km"
-    )
-    output.append(
-        f"  Distance between cross intersections: {common_volume.distance_between_crosses:.2f} km"
-    )
-    output.append(
-        f"  Common volume top (upper intersection): {intersections.upper.distance_km:.2f} km, "
-        f"{intersections.upper.elevation_terrain / 1000:.2f} km above terrain, "
-        f"{intersections.upper.elevation_sea_level / 1000:.2f} km ASL"
-    )
-    output.append(
-        f"  Common volume bottom (lower intersection): {intersections.lower.distance_km:.2f} km, "
-        f"{intersections.lower.elevation_terrain / 1000:.2f} km above terrain, "
-        f"{intersections.lower.elevation_sea_level / 1000:.2f} km ASL"
+        t(
+            "common_volume_bottom",
+            intersections.lower.distance_km,
+            intersections.lower.elevation_terrain / 1000,
+            intersections.lower.elevation_sea_level / 1000,
+        )
     )
 
     # Distance metrics to lower/upper intersections
-    output.append("\nDistance Metrics:")
-    output.append(
-        f"  Distance from A to lower intersection: {common_volume.distance_a_to_lower_intersection:.2f} km"
-    )
-    output.append(
-        f"  Distance from B to lower intersection: {common_volume.distance_b_to_lower_intersection:.2f} km"
-    )
-    output.append(
-        f"  Distance from A to upper intersection: {common_volume.distance_a_to_upper_intersection:.2f} km"
-    )
-    output.append(
-        f"  Distance from B to upper intersection: {common_volume.distance_b_to_upper_intersection:.2f} km"
-    )
-    output.append(
-        f"  Distance between lower and upper intersections: {common_volume.distance_between_lower_upper_intersections:.2f} km"
-    )
+    output.append(t("distance_metrics"))
+    output.append(t("dist_a_lower", common_volume.distance_a_to_lower_intersection))
+    output.append(t("dist_b_lower", common_volume.distance_b_to_lower_intersection))
+    output.append(t("dist_a_upper", common_volume.distance_a_to_upper_intersection))
+    output.append(t("dist_b_upper", common_volume.distance_b_to_upper_intersection))
+    output.append(t("dist_lower_upper", common_volume.distance_between_lower_upper_intersections))
 
     return "\n".join(output)
 
@@ -331,76 +311,77 @@ class ConsoleOutputFormatter:
         method = metadata.get("method", "unknown").upper()
 
         print(f"\n{'=' * 60}")
-        print(f"{method} Analysis Result")
+        print(t("analysis_result", method))
         print(f"{'=' * 60}")
 
         if "site_a_coordinates" in output_dict and "site_b_coordinates" in output_dict:
-            print("\n📍 Site Coordinates:")
+            print(t("site_coordinates"))
             print(
-                f"  Site A:                  {output_dict['site_a_coordinates']['lat']:.6f}°, "
+                f"{t('site_a')}{output_dict['site_a_coordinates']['lat']:.6f}°, "
                 f"{output_dict['site_a_coordinates']['lon']:.6f}°"
             )
             print(
-                f"  Site B:                  {output_dict['site_b_coordinates']['lat']:.6f}°, "
+                f"{t('site_b')}{output_dict['site_b_coordinates']['lat']:.6f}°, "
                 f"{output_dict['site_b_coordinates']['lon']:.6f}°"
             )
 
         if "geo_data" in output_dict:
             geo_dict = output_dict["geo_data"]
-            print("\n🌍 Geographic Data:")
-            print(f"  Distance:                {geo_dict['distance_km']:.2f} km")
-            print(f"  True Azimuth A→B:        {geo_dict['true_azimuth_a_b']:.2f}°")
-            print(f"  True Azimuth B→A:        {geo_dict['true_azimuth_b_a']:.2f}°")
-            print(f"  Mag Declination A:       {geo_dict['mag_declination_a']:.2f}°")
-            print(f"  Mag Declination B:       {geo_dict['mag_declination_b']:.2f}°")
-            print(f"  Mag Azimuth A→B:         {geo_dict['mag_azimuth_a_b']:.2f}°")
-            print(f"  Mag Azimuth B→A:         {geo_dict['mag_azimuth_b_a']:.2f}°")
+            print(t("geographic_data"))
+            print(f"{t('distance')}{geo_dict['distance_km']:.2f} km")
+            print(f"{t('true_azimuth_a_b')}{geo_dict['true_azimuth_a_b']:.2f}°")
+            print(f"{t('true_azimuth_b_a')}{geo_dict['true_azimuth_b_a']:.2f}°")
+            print(f"{t('mag_declination_a')}{geo_dict['mag_declination_a']:.2f}°")
+            print(f"{t('mag_declination_b')}{geo_dict['mag_declination_b']:.2f}°")
+            print(f"{t('mag_azimuth_a_b')}{geo_dict['mag_azimuth_a_b']:.2f}°")
+            print(f"{t('mag_azimuth_b_a')}{geo_dict['mag_azimuth_b_a']:.2f}°")
 
         if "b1_max" in metadata and "b2_max" in metadata and "b_sum" in metadata:
-            print("\n📐 Horizon Close Angles (HCA):")
-            print(f"  Site A (b1_max):         {metadata['b1_max']:.2f}°")
-            print(f"  Site B (b2_max):         {metadata['b2_max']:.2f}°")
-            print(f"  Sum (b_sum):             {metadata['b_sum']:.2f}°")
+            print(t("hca_title"))
+            print(f"{t('site_a_hca')}{metadata['b1_max']:.2f}°")
+            print(f"{t('site_b_hca')}{metadata['b2_max']:.2f}°")
+            print(f"{t('hca_sum')}{metadata['b_sum']:.2f}°")
 
-        print("\n📡 Link Parameters:")
-        print(f"  Wavelength:              {metadata.get('wavelength', 0):.2f} m")
+        print(t("link_parameters"))
+        print(f"{t('wavelength')}{metadata.get('wavelength', 0):.2f} m")
         model_params = analysis_result.get("model_propagation_loss_parameters", {})
         if "frequency_mhz" in metadata:
-            print(f"  Frequency:               {metadata['frequency_mhz']:.2f} MHz")
+            print(f"{t('frequency')}{metadata['frequency_mhz']:.2f} MHz")
         if "hpbw" in metadata:
-            print(f"  HPBW:                    {metadata['hpbw']:.2f}°")
+            print(f"{t('hpbw')}{metadata['hpbw']:.2f}°")
 
-        print("\n📉 Model Propagation Loss Parameters:")
+        print(t("propagation_loss_parameters"))
         if model_params.get("propagation_loss"):
             prop_loss = model_params["propagation_loss"]
             print(
-                f"    ├─ Free Space (L0):          {prop_loss['free_space_loss']:.2f} dB"
+                f"{t('free_space_loss')}{prop_loss['free_space_loss']:.2f} dB"
             )
             print(
-                f"    ├─ median/scattering (lmed): {prop_loss['atmospheric_loss']:.2f} db"
+                f"{t('atmospheric_loss')}{prop_loss['atmospheric_loss']:.2f} dB"
             )
             print(
-                f"    ├─ diffraction (Ld):         {prop_loss['diffraction_loss']:.2f} db"
+                f"{t('diffraction_loss')}{prop_loss['diffraction_loss']:.2f} dB"
             )
             print(
-                f"    └─ refraction (Lr):          {prop_loss['refraction_loss']:.2f} dB"
+                f"{t('refraction_loss')}{prop_loss['refraction_loss']:.2f} dB"
             )
 
         if model_params.get("total_loss") is not None:
-            print(f"  Total Path Loss (Ltot):  {model_params['total_loss']:.2f} dB")
+            print(f"{t('total_path_loss')}{model_params['total_loss']:.2f} dB")
 
         # Sosnik-specific parameters (no propagation_loss breakdown)
         if "extra_dist" in model_params:
-            print(f"  Extra Distance:          {model_params['extra_dist']:.2f} km")
+            print(f"{t('extra_dist')}{model_params['extra_dist']:.2f} km")
         if "equal_dist" in model_params:
-            print(f"  Equalent Distance:       {model_params['equal_dist']:.2f} km")
+            print(f"{t('equal_dist')}{model_params['equal_dist']:.2f} km")
         if "L_correction" in model_params:
-            print(f"  Path Loss Correction:    {model_params['L_correction']:.2f} dB")
+            print(f"{t('l_correction')}{model_params['L_correction']:.2f} dB")
 
-        print("\n🚀 Link Performance:")
+        print(t("link_performance"))
         speed_prefix = metadata.get("speed_prefix", "M")
+        speed_unit = t("mbps") if speed_prefix == "M" else t("kbps")
         print(
-            f"  Estimated Speed:         {analysis_result.get('link_speed', 0):.1f} {speed_prefix}bps"
+            f"{t('estimated_speed')}{analysis_result.get('link_speed', 0):.1f} {speed_unit}"
         )
 
         if (

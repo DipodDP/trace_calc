@@ -64,9 +64,9 @@ class TestAdapterFacade:
             coords="55.367269 91.646198 55.989642 92.899899"
         )
 
-        # Should use default names
-        assert s_names[0] == "Точка А"
-        assert s_names[1] == "Точка Б"
+        # Should use default names (default is 'en' in facade, so 'Site A'/'Site B')
+        assert s_names[0] == "Site A"
+        assert s_names[1] == "Site B"
 
     async def test_coordinate_parsing_single_name(self, trace_analyzer_api: TraceAnalyzerAPI):
         """Test coordinate parsing with single site name."""
@@ -77,7 +77,7 @@ class TestAdapterFacade:
 
         # Should add default second name
         assert s_names[0] == "SiteA"
-        assert s_names[1] == "Точка Б"
+        assert s_names[1] == "Site B"
 
     async def test_coordinate_parsing_invalid_coords(self, trace_analyzer_api: TraceAnalyzerAPI):
         """Test coordinate parsing with invalid coordinates."""

@@ -5,7 +5,7 @@
 
 ## Overview
 
-**Package Name:** `trace-calc` (v0.3.23)
+**Package Name:** `trace-calc` (v0.3.25)
 
 This project provides an asynchronous tool for calculating troposcatter radio link profiles, including terrain analysis and common sacatter volume calculations. It helps in designing and evaluating communication links by providing detailed insights into propagation paths, signal interference areas, and geographical data.
 
@@ -56,6 +56,7 @@ The common scatter volume represents the 3D region where antenna beams overlap:
 
 Analysis outputs are provided in a structured format, available as both console output and a detailed JSON file. This includes:
 
+*   **Multilingual Support (i18n)**: Console output and plots can be generated in English or Russian.
 *   **Detailed Site Coordinates**: Precise latitude and longitude for both sites.
 *   **Geographic Metrics**: Automatically calculated path distance, azimuths, and magnetic declinations.
 *   **Model-Specific Parameters**: Detailed parameters from the propagation model used (e.g., Groza, Sosnik).
@@ -91,6 +92,7 @@ python trace_calc/main.py [--method <name>] [--save-json]
 *   `--method <name>`: Specifies the analysis method to use.
     *   Choices: `groza` (default), `sosnik`.
 *   `--save-json`: If provided, saves the full analysis results to a JSON file in the `output_data/` directory. The filename will be based on the path name you provide.
+*   `--lang <code\>`: Specifies the output language (e.g., `en`, `ru`).
 
 **Interactive Prompts:**
 
@@ -195,7 +197,7 @@ async def analyze_link_with_facade():
         coord_b = [59.9343, 30.3351]  # St. Petersburg
         path_filename = "my_path"
 
-        # 5. Run analysis with a single method call
+        # 5. Run analysis with a single method call (with Russian output)
         (
             L0, Lmed, Lr, trace_dist, b1_max, b2_max,
             b_sum, Ltot, dL, speed, sp_pref, result
@@ -205,6 +207,7 @@ async def analyze_link_with_facade():
             path_filename=path_filename,
             antenna_a_height=30.0,
             antenna_b_height=30.0,
+            lang="ru",
         )
 
         # 6. Access and print results

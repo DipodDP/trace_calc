@@ -25,6 +25,7 @@ from trace_calc.infrastructure.output.formatters import (
     JSONOutputFormatter,
 )
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
+from trace_calc.infrastructure.i18n import set_language, t
 from trace_calc.application.services.user_input_parser import CoordinateParser
 from trace_calc.domain.exceptions import APIException
 
@@ -58,7 +59,7 @@ def get_analysis_service(method: str) -> BaseAnalysisService:
 
 class UserInputHandler:
     def get_coordinates(self, prompt: str) -> list[Coordinates]:
-        print(prompt)
+        print(t(prompt) if prompt in ["coords_required", "provide_coords"] else prompt)
         lines = []
         while True:
             line = input()
@@ -81,12 +82,12 @@ class UserInputHandler:
             raise ValueError("Please enter a valid integer.")
 
     def get_user_input(self) -> InputData:
-        stored_filename = input("Enter stored file name (without .path): ")
+        stored_filename = input(t("enter_stored_filename"))
         antenna_a_height = self.get_antenna_height(
-            "Enter antenna 1 height or skip to use default: "
+            t("enter_antenna_a_height")
         )
         antenna_b_height = self.get_antenna_height(
-            "Enter antenna 2 height or skip to use default: "
+            t("enter_antenna_b_height")
         )
 
         input_data = InputData(path_name=stored_filename)
@@ -119,7 +120,7 @@ async def run_analysis(
     profile_data = result.result.get("profile_data")
 
     speed_prefix = result.result.get("speed_prefix", "M")
-    speed_unit = "Mbps" if speed_prefix == "M" else "kbps"
+    speed_unit = t("mbps") if speed_prefix == "M" else t("kbps")
 
     if args.save_json:
         formatter = JSONOutputFormatter()
@@ -129,11 +130,11 @@ async def run_analysis(
         file_path = os.path.join(OUTPUT_DATA_DIR, f"{input_data.path_name}.json")
         with open(file_path, "w") as f:
             f.write(json_output)
-        print(f"✅ JSON output saved to {file_path}")
-        print(f"   Link speed: {result.link_speed:.1f} {speed_unit}")
+        print(t("json_saved", file_path))
+        print(f"   {t('link_speed_info', result.link_speed, speed_unit)}")
     else:
         deps.output_formatter.format_result(result, input_data, geo_data, profile_data)
-        print(f"✅ Analysis complete! Link speed: {result.link_speed:.1f} {speed_unit}")
+        print(t("analysis_complete", result.link_speed, speed_unit))
 
 
 async def main():
@@ -150,7 +151,17 @@ async def main():
         action="store_true",
         help="Save JSON output to a file in the output_data directory",
     )
+    parser.add_argument(
+        "--lang",
+        type=str,
+        choices=["en", "ru"],
+        default="en",
+        help="Language for output and plots (en or ru)",
+    )
     args = parser.parse_args()
+
+    # Set language
+    set_language(args.lang)
 
     # Load environment variables as early as possible within main()
     env = Env()
@@ -171,9 +182,9 @@ async def main():
             input_data.site_a_coordinates = Coordinates(*path.coordinates[0])
             input_data.site_b_coordinates = Coordinates(*path.coordinates[-1])
         except (FileNotFoundError, IndexError, ValueError):
-            print("Coordinates are required for calculation. Enter them manually.")
+            print(t("coords_required"))
             coords = input_handler.get_coordinates(
-                "Provide coordinates for sites A and B, then press Enter again to proceed: "
+                "provide_coords"
             )
             if len(coords) == 2:
                 input_data.site_a_coordinates, input_data.site_b_coordinates = coords
