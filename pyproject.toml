@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "trace-calc"
-version = "0.3.24"
-description = ""
+version = "0.3.25"
+description = "Troposcatter Trace Calculation and Link Analysis with i18n support"
 authors = ["DipodDP <dipoddp@gmail.com>"]
 readme = "README.md"
 packages = [{include = "trace_calc"}]

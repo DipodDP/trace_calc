@@ -16,6 +16,7 @@ from trace_calc.application.analysis import (
 from trace_calc.application.services.user_input_parser import CoordinateParser
 from trace_calc.infrastructure.visualization.plotter import ProfileVisualizer
 from trace_calc.domain.models.analysis import AnalysisResult
+from trace_calc.infrastructure.i18n import t, set_language
 
 
 class TraceAnalyzerAPI:
@@ -93,17 +94,11 @@ class TraceAnalyzerAPI:
             return self._coord_parser.parse_with_names(
                 s_name,
                 coords,
-                default_name_a='Точка А',
-                default_name_b='Точка Б',
+                default_name_a=t('site_a_default'),
+                default_name_b=t('site_b_default'),
             )
         except ValueError as e:
-            raise ValueError(
-                f"Could not parse coordinates. {str(e)}\n"
-                f"Supported formats:\n"
-                f"  - Decimal: 55.7558 37.6173\n"
-                f"  - DMS: 55°45'25.4\"N 37°37'6.2\"E\n"
-                f"  - Mixed separators: commas, spaces, semicolons"
-            ) from e
+            raise ValueError(t("coord_parse_error", str(e))) from e
 
     async def get_azimuths(
         self, coords_dec: list[float]
@@ -121,10 +116,7 @@ class TraceAnalyzerAPI:
             RuntimeError: If API request fails
         """
         if len(coords_dec) != 4:
-            raise ValueError(
-                f"Expected 4 coordinates, got {len(coords_dec)}. "
-                f"Format: [lat1, lon1, lat2, lon2]"
-            )
+            raise ValueError(t("expected_4_coords", len(coords_dec)))
 
         coord_a = Coordinates(lat=coords_dec[0], lon=coords_dec[1])
         coord_b = Coordinates(lat=coords_dec[2], lon=coords_dec[3])
@@ -150,6 +142,7 @@ class TraceAnalyzerAPI:
         antenna_a_height: float = 2.0,
         antenna_b_height: float = 2.0,
         geo_data: GeoData | None = None,
+        lang: str = "en",
     ) -> tuple[float, float, float, float, float, float, float, float, float, float, str, AnalysisResult]:
         """
         Run Groza propagation analysis.
@@ -161,11 +154,13 @@ class TraceAnalyzerAPI:
             antenna_a_height: Antenna A height in meters (default: 2.0)
             antenna_b_height: Antenna B height in meters (default: 2.0)
             geo_data: Optional pre-calculated geographic data to avoid refetching
+            lang: Language for output and plots ('en' or 'ru', default: 'en')
 
         Returns:
             Tuple of (L0, Lmed, Lr, trace_dist, b1_max, b2_max,
                      b_sum, Ltot, dL, speed, sp_pref, result)
         """
+        set_language(lang)
         result = await self._run_analysis(
             "groza",
             coord_a,
@@ -202,6 +197,7 @@ class TraceAnalyzerAPI:
         antenna_a_height: float = 2.0,
         antenna_b_height: float = 2.0,
         geo_data: GeoData | None = None,
+        lang: str = "en",
     ) -> tuple[float, float, float, float, float, float, float, str, AnalysisResult]:
         """
         Run Sosnik propagation analysis.
@@ -213,11 +209,13 @@ class TraceAnalyzerAPI:
             antenna_a_height: Antenna A height in meters (default: 2.0)
             antenna_b_height: Antenna B height in meters (default: 2.0)
             geo_data: Optional pre-calculated geographic data to avoid refetching
+            lang: Language for output and plots ('en' or 'ru', default: 'en')
 
         Returns:
             Tuple of (trace_dist, extra_dist, b1_max, b2_max,
                      b_sum, Lr, speed, sp_pref, result)
         """
+        set_language(lang)
         result = await self._run_analysis(
             "sosnik",
             coord_a,
