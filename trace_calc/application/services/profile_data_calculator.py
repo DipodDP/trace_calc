@@ -167,6 +167,27 @@ class ProfileDataCalculator:
             x_intersectionersect, y_corrected, h_terrain, angle=angle_deg
         )
 
+    @staticmethod
+    def _clamp_to_path(
+        x: float,
+        y: float,
+        line: NDArray[np.float64],
+        distances: NDArray[np.float64],
+    ) -> tuple[float, float]:
+        """
+        Clamp an intersection to the path bounds, keeping it on its sight line.
+
+        Returns the point unchanged when it already lies on the path. Otherwise the
+        distance is clamped to the nearest endpoint and the elevation is re-evaluated
+        on `line`, so the result stays on the beam edge rather than floating off it.
+        """
+        x_min, x_max = float(distances[0]), float(distances[-1])
+        if x_min <= x <= x_max:
+            return x, y
+
+        x_clamped = min(max(x, x_min), x_max)
+        return x_clamped, float(np.polyval(line, x_clamped))
+
     def _calculate_all_intersections(
         self,
         sight_lines: SightLinesData,
@@ -185,7 +206,10 @@ class ProfileDataCalculator:
             IntersectionsData with all 4 intersections
 
         Raises:
-            ValueError: If any intersection is invalid or outside path
+            ValueError: If the lower or upper intersection falls outside the path.
+                Cross intersections outside the path are clamped to its bounds
+                (see `_clamp_to_path`), since on a line-of-sight path they
+                legitimately fall at or beyond the sites.
         """
         # Lower intersection
         x, y = geometry.find_line_intersection(sight_lines.lower_a, sight_lines.lower_b)
@@ -213,10 +237,13 @@ class ProfileDataCalculator:
         )
         upper_intersection = IntersectionPoint(x, y_corrected, h_terrain)
 
-        # Cross AB intersection
+        # Cross AB intersection.
+        # On a line-of-sight path neither site is obstructed, so each site's horizon
+        # point is the opposite site, the lower sight lines nearly coincide, and the
+        # beams opened by a full HPBW cross outside the path. That means the beams
+        # overlap along the entire path, so clamp to the path instead of rejecting.
         x, y = geometry.find_line_intersection(sight_lines.upper_a, sight_lines.lower_b)
-        if not (distances[0] <= x <= distances[-1]):
-            raise ValueError(f"Cross AB intersection at {x} km is outside path bounds")
+        x, y = self._clamp_to_path(x, y, sight_lines.upper_a, distances)
 
         drop = calculate_earth_drop(np.array([x]))[0]
         y_corrected = y - drop
@@ -228,8 +255,7 @@ class ProfileDataCalculator:
 
         # Cross BA intersection
         x, y = geometry.find_line_intersection(sight_lines.upper_b, sight_lines.lower_a)
-        if not (distances[0] <= x <= distances[-1]):
-            raise ValueError(f"Cross BA intersection at {x} km is outside path bounds")
+        x, y = self._clamp_to_path(x, y, sight_lines.upper_b, distances)
 
         drop = calculate_earth_drop(np.array([x]))[0]
         y_corrected = y - drop
