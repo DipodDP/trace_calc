@@ -101,6 +101,40 @@ class TestProfileDataCalculatorExtensions:
         ):
             calculator._calculate_all_intersections(sight_lines, distances, elevations)
 
+    def test_cross_intersections_clamped_on_line_of_sight_path(self):
+        """Cross intersections outside the path are clamped, not rejected.
+
+        On a short line-of-sight path neither site is obstructed, so each site's
+        horizon point is the opposite site. The lower sight lines nearly coincide
+        and the beams, opened by a full HPBW, cross outside the path: the beams
+        overlap along its whole length. That is valid geometry.
+        """
+        # Lower lines nearly coincident (A->B and B->A), upper lines opened wide.
+        sight_lines = SightLinesData(
+            lower_a=np.array([-3.45, 368.65]),
+            lower_b=np.array([-3.28, 366.65]),
+            upper_a=np.array([40.20, 368.65]),
+            upper_b=np.array([-46.95, 1372.66]),
+            antenna_elevation_angle_a=np.array([]),
+            antenna_elevation_angle_b=np.array([]),
+        )
+
+        distances = np.linspace(0, 23.038, 512)
+        elevations = np.full_like(distances, 300.0)
+        calculator = ProfileDataCalculator(distances, elevations)
+
+        intersections = calculator._calculate_all_intersections(
+            sight_lines, distances, elevations
+        )
+
+        # cross_ab falls behind site A, cross_ba beyond site B: both clamped.
+        assert intersections.cross_ab.distance_km == pytest.approx(distances[0])
+        assert intersections.cross_ba.distance_km == pytest.approx(distances[-1])
+
+        # The on-path lower/upper intersections are untouched.
+        assert distances[0] <= intersections.lower.distance_km <= distances[-1]
+        assert distances[0] <= intersections.upper.distance_km <= distances[-1]
+
     def setup_volume_test(self):
         self.sight_lines = SightLinesData(
             lower_a=np.array([0.1, 100]),
@@ -219,18 +253,22 @@ class TestProfileDataCalculatorExtensions:
     def test_calculate_all_with_angle_offset(self):
         """Test full calculation with HPBW
 
-        With the angle-based line creation fix, extreme height differences
-        can now be handled better. The upper intersection is now valid,
-        but cross intersections may still fail for very asymmetric cases.
+        Highly asymmetric antenna heights push the cross intersections off the
+        path. These are clamped to the path bounds rather than raising, so the
+        calculation completes and reports beams overlapping the whole path.
         """
         hca_indices = (50, 50)
         height_offsets = (Meters(2), Meters(40))  # User requested antenna heights
         angle_offset = Angle(2.5)  # User requested offset
 
-        with pytest.raises(
-            ValueError, match=".* intersection .* is outside path bounds"
-        ):
-            self.calculator.calculate_all(hca_indices, height_offsets, angle_offset)
+        profile_data = self.calculator.calculate_all(
+            hca_indices, height_offsets, angle_offset
+        )
+
+        crosses = profile_data.intersections
+        assert self.distances[0] <= crosses.cross_ab.distance_km <= self.distances[-1]
+        assert self.distances[0] <= crosses.cross_ba.distance_km <= self.distances[-1]
+        assert profile_data.volume.cone_intersection_volume_m3 >= 0
 
     def test_calculate_all_zero_angle_backward_compat(self):
         """Test backward compatibility with zero offset"""
